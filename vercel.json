@@ -1,0 +1,10 @@
+{
+  "installCommand": "npm ci && npm ci --prefix admin-dashboard && npm ci --prefix super-admin-dashboard",
+  "buildCommand": "npm run build:all",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/admin-app/:path*", "destination": "/admin-app/index.html" },
+    { "source": "/super-admin-app/:path*", "destination": "/super-admin-app/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
