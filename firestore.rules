@@ -12,6 +12,7 @@ rules_version = '2';
 //   orders, withdrawals, notifications, payoutMethods, supportConversations, ledger, campaigns,
 //   loginHistory, activityLogs      every doc carries `sellerId` and the owning admin's `adminId`
 //   superAdminLogs, adminLoginHistory   super-admin console audit trail
+//   adminDevices/{adminId}   the names an admin gave their sign-in devices
 //
 // Who may do what: a seller reads and writes their own shop data; an admin manages the sellers who
 // joined through their invite code (`adminId == their uid`); a super admin manages everything.
@@ -502,12 +503,17 @@ service cloud.firestore {
 
     // ---- seller login history + activity feed ------------------------------------------------------
 
+    // `ip` and `location` ("Shahkot, Punjab, Pakistan") say where the sign-in came from. The place of an
+    // older entry can be filled in afterwards ("Backfill locations"), and nothing else about it can change.
     match /loginHistory/{entryId} {
       allow get, list: if signedIn() && managesDoc();
       allow create: if signedIn() && actsForNew()
-        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'at', 'ip', 'device'])
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'at', 'ip', 'device', 'location'])
         && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId;
-      allow update, delete: if false;
+      allow update: if signedIn() && managesDoc()
+        && diffKeys().hasOnly(['location'])
+        && request.resource.data.location is string && request.resource.data.location.size() <= 160;
+      allow delete: if false;
     }
 
     // What the admin's network has been up to. Sellers write their own entries (sign-up, payments,
@@ -515,7 +521,10 @@ service cloud.firestore {
     match /activityLogs/{logId} {
       allow get, list: if signedIn() && managesDoc();
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['adminId', 'sellerId', 'actorId', 'type', 'title', 'entity', 'icon', 'at', 'amount'])
+        && request.resource.data.keys().hasOnly(['adminId', 'sellerId', 'actorId', 'type', 'title', 'entity', 'icon', 'at', 'amount', 'meta'])
+        // `meta`: what the feed shows beyond the headline (products, payout method, place of a sign-up).
+        && request.resource.data.get('meta', {}) is map
+        && request.resource.data.get('meta', {}).size() <= 12
         && (managesNew()
             || (request.resource.data.get('sellerId', '') == request.auth.uid
                 && shopAfter(request.auth.uid).adminId == request.resource.data.adminId));
@@ -537,12 +546,29 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // An admin's own sign-ins: when, through what, from which device (`deviceId` is a random id kept in
+    // that browser) and from where (`ip`, `location`). A missing place can be filled in later.
     match /adminLoginHistory/{entryId} {
       allow get, list: if isSuperAdmin() || (isAdmin() && resource.data.adminId == request.auth.uid);
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['adminId', 'at', 'via'])
+        && request.resource.data.keys().hasOnly(['adminId', 'at', 'via', 'ip', 'location', 'device', 'deviceId'])
         && (isSuperAdmin() || (isAdmin() && request.resource.data.adminId == request.auth.uid));
-      allow update, delete: if false;
+      allow update: if (isSuperAdmin() || (isAdmin() && resource.data.adminId == request.auth.uid))
+        && diffKeys().hasOnly(['location'])
+        && request.resource.data.location is string && request.resource.data.location.size() <= 160;
+      allow delete: if false;
+    }
+
+    // The names an admin has given their devices in "My Logs": { labels: { <deviceKey>: 'Office PC' } }.
+    match /adminDevices/{adminId} {
+      allow get: if signedIn() && (isSuperAdmin() || (isAdmin() && request.auth.uid == adminId));
+      allow list: if false;
+      allow create, update: if signedIn() && isAdmin() && request.auth.uid == adminId
+        && request.resource.data.keys().hasOnly(['adminId', 'labels'])
+        && request.resource.data.adminId == adminId
+        && request.resource.data.labels is map
+        && request.resource.data.labels.size() <= 100;
+      allow delete: if false;
     }
   }
 }

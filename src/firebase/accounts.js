@@ -26,7 +26,7 @@ import {
   memberSinceLabel,
   NOT_CONFIGURED_MESSAGE,
 } from './core'
-import { COL, createWelcomeConversation, newShopRecord, normalizeShop, stageActivity } from './shopData'
+import { COL, createWelcomeConversation, describeDevice, lookupLocation, newShopRecord, normalizeShop, stageActivity } from './shopData'
 
 export { subscribeAuth, isFirebaseConfigured } from './core'
 
@@ -107,6 +107,8 @@ export async function signUpSellerAccount({ documents, ...fields }) {
   if (!isFirebaseConfigured) return fail(NOT_CONFIGURED_MESSAGE)
   const { auth, db } = getServices(SELLER_APP)
   let user = null
+  // Where the seller is signing up from, looked up while the account is being created.
+  const whereFrom = lookupLocation().catch(() => null)
   try {
     const invite = await lookupInviteCode(db, fields.inviteCode, 'admin')
     if (!invite) return fail('That invitation code is not valid. Check it with your admin.')
@@ -142,6 +144,7 @@ export async function signUpSellerAccount({ documents, ...fields }) {
         updatedAt: profile.createdAt,
       })
     }
+    const place = await whereFrom
     stageActivity(db, batch, {
       adminId: invite.ownerUid,
       sellerId: user.uid,
@@ -150,6 +153,7 @@ export async function signUpSellerAccount({ documents, ...fields }) {
       title: 'New seller registered',
       entity: name,
       icon: 'signup',
+      meta: { email: user.email, device: describeDevice(), ip: place?.ip || undefined, location: place?.location || undefined },
     })
     await batch.commit()
     const shop = normalizeShop(user.uid, shopRecord)

@@ -569,6 +569,97 @@ describe('views campaigns, ledger and logs', () => {
   })
 })
 
+describe('what Recent Actions and My Logs read', () => {
+  const lastActivity = async (type) => {
+    const feed = await getDocs(query(collection(db('a1'), 'activityLogs'), where('adminId', '==', 'a1')))
+    return feed.docs.map((d) => d.data()).filter((row) => row.type === type)
+  }
+
+  it('keeps where a seller signed in from, and lets only the place be filled in afterwards', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    await shop.recordSellerLogin(db('s1'), target, { where: { ip: '162.4.16.175', location: 'Shahkot, Punjab, Pakistan' } })
+    await shop.recordSellerLogin(db('s1'), target, { where: { ip: '119.73.96.111', location: '' } })
+    const history = await getDocs(query(collection(db('a1'), 'loginHistory'), where('adminId', '==', 'a1')))
+    const located = history.docs.find((d) => d.data().location)
+    const unlocated = history.docs.find((d) => d.data().ip === '119.73.96.111')
+    assert.equal(located.data().location, 'Shahkot, Punjab, Pakistan')
+    assert.equal(unlocated.data().location, undefined)
+    // the admin can add the place to an entry, nothing else about it; the seller cannot touch history
+    await assertSucceeds(updateDoc(doc(db('a1'), `loginHistory/${unlocated.id}`), { location: 'Karachi, Sindh, Pakistan' }))
+    await assertFails(updateDoc(doc(db('a1'), `loginHistory/${unlocated.id}`), { ip: '1.1.1.1' }))
+    await assertFails(updateDoc(doc(db('s1'), `loginHistory/${unlocated.id}`), { location: 'Anywhere' }))
+    await assertFails(updateDoc(doc(db('a2'), `loginHistory/${unlocated.id}`), { location: 'Anywhere' }))
+  })
+
+  it('lists the products added to a shop, and what was removed', async () => {
+    await verifiedShop({ balance: 0 })
+    const details = { p1: { name: 'Bakers Rack', image: '/assets/a.jpg', price: 99.99 }, p2: { name: 'Desk', image: '/assets/b.jpg', price: 89.99 } }
+    assert.equal((await shop.addProductsToShop(db('s1'), 's1', ['p1', 'p2'], 's1', details)).success, true)
+    const [added] = await lastActivity('seller_products_added')
+    assert.deepEqual(added.meta.items, [
+      { id: 'p1', name: 'Bakers Rack', image: '/assets/a.jpg', price: 99.99 },
+      { id: 'p2', name: 'Desk', image: '/assets/b.jpg', price: 89.99 },
+    ])
+    assert.equal((await shop.removeProductFromShop(db('s1'), 's1', 'p1', 's1', details)).success, true)
+    const [removed] = await lastActivity('seller_product_removed')
+    assert.equal(removed.meta.items[0].name, 'Bakers Rack')
+    assert.equal(removed.actorId, 's1')
+  })
+
+  it('notes the payout method on a saved method, a withdrawal request and its decision', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    const method = { type: 'crypto', label: 'USDT', network: 'USDT_TRC20', walletAddress: 'T1', isDefault: true }
+    assert.equal((await shop.savePayoutMethod(db('s1'), target, method)).success, true)
+    assert.equal((await lastActivity('payout_method_added'))[0].meta.method, 'Crypto · USDT_TRC20')
+    const request = await shop.requestWithdrawal(db('s1'), 's1', 40, method)
+    assert.equal(request.success, true)
+    const [requested] = await lastActivity('withdrawal_requested')
+    assert.equal(requested.amount, 40)
+    assert.equal(requested.meta.method, 'Crypto · USDT_TRC20')
+    assert.equal((await shop.processWithdrawal(db('a1'), target, request.request.id, true, 'a1')).success, true)
+    assert.equal((await lastActivity('withdrawal_approved'))[0].meta.method, 'Crypto · USDT_TRC20')
+  })
+
+  it('gives an order payment its amount', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    const created = await shop.createOrder(db('a1'), target, { items: [ITEM] }, 'a1')
+    assert.equal((await shop.payOrder(db('s1'), 's1', created.order.id)).success, true)
+    assert.equal((await lastActivity('order_paid'))[0].amount, 30)
+  })
+
+  it('carries the place and device of a sign-up in the activity line, and refuses stray fields', async () => {
+    await shop.ensureShop(db('s1'), 's1', { id: 's1', ...sellerProfile('s1', 'a1') })
+    const line = { adminId: 'a1', sellerId: 's1', actorId: 's1', type: 'seller_signup', title: 'New seller registered', entity: 's1', icon: 'signup', at: now }
+    await assertSucceeds(setDoc(doc(db('s1'), 'activityLogs/signup'), { ...line, meta: { email: 's1@x.com', location: 'Shahkot, Punjab, Pakistan', ip: '162.4.16.175', device: 'Desktop • Windows • Chrome' } }))
+    await assertFails(setDoc(doc(db('s1'), 'activityLogs/loose'), { ...line, extra: 'nope' }))
+    await assertFails(setDoc(doc(db('s1'), 'activityLogs/notamap'), { ...line, meta: 'text' }))
+  })
+
+  it('records an admin sign-in with its device and place, and lets only the place be added later', async () => {
+    await shop.logAdminLogin(db('a1'), 'a1', 'Admin console', { device: 'Desktop • Windows • Chrome', deviceId: 'dev-1', ip: '162.4.16.175', location: '' })
+    await shop.logAdminLogin(db('a1'), 'a1', 'Admin console', Promise.resolve({ device: 'Desktop • Windows • Chrome', deviceId: 'dev-1', ip: '162.4.16.175', location: 'Shahkot, Punjab, Pakistan' }))
+    const rows = await getDocs(query(collection(db('a1'), 'adminLoginHistory'), where('adminId', '==', 'a1')))
+    assert.equal(rows.size, 2)
+    const plain = rows.docs.find((d) => !d.data().location)
+    assert.equal(plain.data().deviceId, 'dev-1')
+    await assertSucceeds(updateDoc(doc(db('a1'), `adminLoginHistory/${plain.id}`), { location: 'Shahkot, Punjab, Pakistan' }))
+    await assertFails(updateDoc(doc(db('a1'), `adminLoginHistory/${plain.id}`), { at: now }))
+    await assertFails(updateDoc(doc(db('a2'), `adminLoginHistory/${plain.id}`), { location: 'Anywhere' }))
+  })
+
+  it('lets an admin name their devices, privately', async () => {
+    assert.equal((await shop.saveDeviceLabel(db('a1'), 'a1', 'dev-1', 'Office PC')).success, true)
+    assert.equal((await shop.saveDeviceLabel(db('a1'), 'a1', 'dev-2', 'Laptop')).success, true)
+    assert.deepEqual((await read(db('a1'), 'adminDevices/a1')).labels, { 'dev-1': 'Office PC', 'dev-2': 'Laptop' })
+    assert.equal((await shop.saveDeviceLabel(db('a1'), 'a1', 'dev-1', '')).success, true)
+    assert.deepEqual((await read(db('a1'), 'adminDevices/a1')).labels, { 'dev-2': 'Laptop' })
+    assert.equal((await shop.saveDeviceLabel(db('a2'), 'a1', 'dev-1', 'mine now')).success, false)
+    assert.equal((await shop.saveDeviceLabel(db('s1'), 'a1', 'dev-1', 'mine now')).success, false)
+    await assertFails(getDoc(doc(db('a2'), 'adminDevices/a1')))
+    await assertSucceeds(getDoc(doc(db('sa1'), 'adminDevices/a1')))
+  })
+})
+
 describe('"log in as" sessions use the impersonator\'s identity', () => {
   it('lets an admin act as their seller: pay an order, request a withdrawal, manage the catalogue', async () => {
     const target = await verifiedShop({ balance: 100 })

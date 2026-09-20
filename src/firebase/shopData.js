@@ -15,6 +15,7 @@ import {
   arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   increment,
@@ -43,6 +44,7 @@ export const COL = {
   activity: 'activityLogs',
   superLogs: 'superAdminLogs',
   adminLogins: 'adminLoginHistory',
+  adminDevices: 'adminDevices',
   security: 'sellerSecurity',
 }
 
@@ -56,6 +58,14 @@ const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 1
 const newId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 const clean = (object) => Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined))
 const money = (value) => `$${Number(value || 0).toFixed(2)}`
+
+// "Crypto · USDT_TRC20" / "Bank · Awais NBank": how a payout method reads in the admin's feed.
+const methodSummary = (method, fallback = '') => {
+  if (!method || typeof method !== 'object') return String(method || fallback || '')
+  const kind = method.type === 'crypto' ? 'Crypto' : method.type === 'bank' ? 'Bank' : ''
+  const detail = method.type === 'crypto' ? method.network || method.label : method.bankName || method.label
+  return [kind, detail].filter(Boolean).join(' · ') || String(fallback || '')
+}
 
 // A refusal we raise ourselves inside a transaction, so its message reaches the UI as written.
 class Refusal extends Error {}
@@ -209,9 +219,11 @@ export const sortNewest = (list, field = 'createdAt') => [...list].sort(byNewest
 // ---- activity feeds ---------------------------------------------------------------------------
 
 // Writes an activity entry into a batch / transaction so it commits atomically with what it describes.
-export function stageActivity(db, writer, { adminId, sellerId, actorId, type, title, entity, icon, amount }) {
+// `meta` carries what the admin's feed shows beyond the headline: the products in an "added to shop"
+// line, the payout method of a withdrawal, the place and device of a sign-up.
+export function stageActivity(db, writer, { adminId, sellerId, actorId, type, title, entity, icon, amount, meta }) {
   const ref = doc(collection(db, COL.activity))
-  writer.set(ref, clean({ adminId, sellerId, actorId, type, title, entity, icon, amount, at: nowIso() }))
+  writer.set(ref, clean({ adminId, sellerId, actorId, type, title, entity, icon, amount, meta: meta && Object.keys(clean(meta)).length ? clean(meta) : undefined, at: nowIso() }))
 }
 
 // A log entry on its own (best effort: a failed log never fails the action it describes).
@@ -228,10 +240,157 @@ export async function pushSuperLog(db, entry) {
   } catch (_) {}
 }
 
-export async function logAdminLogin(db, adminId, via) {
+// `details` (optional, may be a promise) is what `sessionDetails()` returns: the device, its id and
+// where it is. The time is taken now, so a slow location lookup never back-dates or delays the entry.
+export async function logAdminLogin(db, adminId, via, details) {
+  const at = nowIso()
   try {
-    await setDoc(doc(db, COL.adminLogins, newId('alh')), { adminId, via, at: nowIso() })
+    const session = (await details) || {}
+    await setDoc(
+      doc(db, COL.adminLogins, newId('alh')),
+      clean({ adminId, via, at, ip: session.ip || undefined, location: session.location || undefined, device: session.device || undefined, deviceId: session.deviceId || undefined })
+    )
   } catch (_) {}
+}
+
+// ---- where a sign-in comes from -------------------------------------------------------------------
+// The place is worked out from the public IP address (city level — a browser cannot know more without
+// asking for GPS). Free lookup services are tried in turn; any failure just means "no location".
+
+const LOOKUP_TIMEOUT = 4000
+const LOOKUP_BUDGET = 8000
+const OWN_LOOKUP_TTL = 5 * 60 * 1000
+
+const readLocation = (parts) => {
+  const seen = []
+  for (const part of parts) {
+    const value = String(part || '').trim()
+    if (value && !seen.includes(value)) seen.push(value)
+  }
+  return seen.join(', ')
+}
+
+async function fetchJson(url, timeout = LOOKUP_TIMEOUT) {
+  const controller = typeof AbortController === 'function' ? new AbortController() : null
+  const timer = controller ? setTimeout(() => controller.abort(), timeout) : null
+  try {
+    const response = await fetch(url, { signal: controller?.signal, cache: 'no-store' })
+    return response.ok ? await response.json() : null
+  } catch (_) {
+    return null
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+const LOOKUPS = [
+  async (ip) => {
+    const data = await fetchJson(`https://ipwho.is/${ip || ''}`)
+    if (!data || data.success === false) return null
+    return { ip: data.ip, location: readLocation([data.city, data.region, data.country]) }
+  },
+  async (ip) => {
+    const data = await fetchJson(`https://ipapi.co/${ip ? `${ip}/` : ''}json/`)
+    if (!data || data.error) return null
+    return { ip: data.ip, location: readLocation([data.city, data.region, data.country_name]) }
+  },
+  async (ip) => {
+    if (ip) return null
+    const data = await fetchJson('https://api.ipify.org?format=json')
+    return data?.ip ? { ip: data.ip, location: '' } : null
+  },
+]
+
+let ownLookup = null
+
+// `{ ip, location }` for the given IP (or for this device's own public IP), or `null` when it cannot be
+// worked out — offline, blocked by an extension, or not in a browser at all (tests, server tools).
+export async function lookupLocation(ip) {
+  if (typeof window === 'undefined' || typeof fetch !== 'function') return null
+  const own = !ip
+  if (own && ownLookup && Date.now() - ownLookup.at < OWN_LOOKUP_TTL) return ownLookup.result
+  let result = null
+  const deadline = Date.now() + LOOKUP_BUDGET
+  for (const lookup of LOOKUPS) {
+    if (Date.now() > deadline) break
+    const found = await lookup(ip)
+    if (found && (found.ip || found.location)) {
+      result = { ip: found.ip || ip || '', location: found.location || '' }
+      if (result.location) break
+    }
+  }
+  if (own && result) ownLookup = { at: Date.now(), result }
+  return result
+}
+
+// A random id for this browser, kept in local storage: lets the admin's login history say which of
+// the listed devices is the one they are on, and lets them name it.
+export function deviceId() {
+  try {
+    let id = localStorage.getItem('uss_device_id')
+    if (!id) {
+      id = `dev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+      localStorage.setItem('uss_device_id', id)
+    }
+    return id
+  } catch (_) {
+    return ''
+  }
+}
+
+// Everything worth noting about the browser that is signing in right now.
+export async function sessionDetails() {
+  const found = await lookupLocation()
+  return { device: describeDevice(), deviceId: deviceId(), ip: found?.ip || '', location: found?.location || '' }
+}
+
+// ---- admin: naming devices, filling in missing places --------------------------------------------
+
+// The key a device is filed under: its id, or (for sign-ins from before ids existed) its address + description.
+export const deviceKey = (entry) => String(entry.deviceId || `${entry.ip || ''}|${entry.device || ''}`).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 120)
+
+export function watchDeviceLabels(db, adminId, onData, onError = () => {}) {
+  return onSnapshot(
+    doc(db, COL.adminDevices, adminId),
+    (snap) => onData(snap.exists() ? snap.data().labels || {} : {}),
+    (error) => onError(error, COL.adminDevices)
+  )
+}
+
+// An empty name removes the label ("Unknown device" again).
+export const saveDeviceLabel = (db, adminId, key, label) =>
+  attempt(async () => {
+    const name = text(label, 40)
+    await setDoc(doc(db, COL.adminDevices, adminId), { adminId, labels: { [key]: name || deleteField() } }, { merge: true })
+    return { success: true, label: name }
+  })
+
+// Entries that have an address but no place (the lookup failed at the time, or the service was down):
+// look the address up now and store the place on the entry. `rows` are `{ collection, id, ip }`.
+export async function backfillLocations(db, rows) {
+  const places = new Map()
+  let updated = 0
+  let unresolved = 0
+  let failed = 0
+  for (const row of rows) {
+    if (!row.ip || /[^0-9a-fA-F:.]/.test(row.ip)) {
+      unresolved += 1
+      continue
+    }
+    if (!places.has(row.ip)) places.set(row.ip, (await lookupLocation(row.ip))?.location || '')
+    const location = places.get(row.ip)
+    if (!location) {
+      failed += 1
+      continue
+    }
+    try {
+      await updateDoc(doc(db, row.collection, row.id), { location })
+      updated += 1
+    } catch (_) {
+      failed += 1
+    }
+  }
+  return { success: true, updated, unresolved, failed }
 }
 
 // ---- seller: shop lifecycle ---------------------------------------------------------------------
@@ -260,13 +419,23 @@ export function describeDevice() {
   return [type, os, browser].filter(Boolean).join(' • ')
 }
 
-// Notes that the seller signed in: last-active stamp + a line in the admin's login history.
-export async function recordSellerLogin(db, shop, { device = describeDevice() } = {}) {
+// Notes that the seller signed in: last-active stamp + a line in the admin's login history, with the
+// address and place the sign-in came from. `where` is `{ ip, location }`; left out, it is looked up now.
+export async function recordSellerLogin(db, shop, { device = describeDevice(), where } = {}) {
+  const at = nowIso()
   try {
+    const found = where === undefined ? await lookupLocation() : where
     const batch = writeBatch(db)
-    batch.update(doc(db, COL.shops, shop.id), { lastActiveAt: nowIso() })
-    batch.set(doc(collection(db, COL.loginHistory)), { sellerId: shop.id, adminId: shop.adminId, at: nowIso(), device })
+    batch.update(doc(db, COL.shops, shop.id), { lastActiveAt: at })
+    batch.set(doc(collection(db, COL.loginHistory)), clean({ sellerId: shop.id, adminId: shop.adminId, at, device, ip: found?.ip || undefined, location: found?.location || undefined }))
     await batch.commit()
+  } catch (_) {}
+}
+
+// The seller has the storefront open: keeps "Online" in the admin console honest.
+export async function touchLastActive(db, sellerId) {
+  try {
+    await updateDoc(doc(db, COL.shops, sellerId), { lastActiveAt: nowIso() })
   } catch (_) {}
 }
 
@@ -444,7 +613,7 @@ export const payOrder = (db, sellerId, orderId, actorId = sellerId) =>
       if ((shop.balance || 0) < order.cost) refuse('Your shop balance is too low. Top up your wallet to process this order.')
       tx.update(orderRef, { status: 'Paid', paidAt: nowIso() })
       tx.update(shopRef, { balance: round2((shop.balance || 0) - order.cost) })
-      stageActivity(db, tx, { adminId: shop.adminId, sellerId, actorId, type: 'order_paid', title: 'Paid to process order', entity: shop.fullName, icon: 'pay' })
+      stageActivity(db, tx, { adminId: shop.adminId, sellerId, actorId, type: 'order_paid', title: 'Paid to process order', entity: shop.fullName, icon: 'pay', amount: order.cost })
       return { success: true }
     })
   )
@@ -488,6 +657,7 @@ export const requestWithdrawal = (db, sellerId, amount, method, actorId = seller
         entity: shop.fullName,
         icon: 'wallet',
         amount: value,
+        meta: { method: methodSummary(method) },
       })
       if (onBehalf && notify) {
         stageNotification(db, tx, { id: sellerId, adminId: shop.adminId }, {
@@ -501,7 +671,7 @@ export const requestWithdrawal = (db, sellerId, amount, method, actorId = seller
   )
 
 // `replaceIds`: the previous default method(s) a new default supersedes.
-export const savePayoutMethod = (db, shop, method, replaceIds = []) =>
+export const savePayoutMethod = (db, shop, method, replaceIds = [], actorId = shop.id) =>
   attempt(async () => {
     const saved = clean({
       sellerId: shop.id,
@@ -521,6 +691,16 @@ export const savePayoutMethod = (db, shop, method, replaceIds = []) =>
     const batch = writeBatch(db)
     batch.set(ref, saved)
     if (saved.isDefault) replaceIds.forEach((id) => batch.delete(doc(db, COL.payoutMethods, id)))
+    stageActivity(db, batch, {
+      adminId: shop.adminId,
+      sellerId: shop.id,
+      actorId,
+      type: 'payout_method_added',
+      title: 'Payout method added',
+      entity: shop.fullName,
+      icon: 'wallet',
+      meta: { method: methodSummary(saved) },
+    })
     await batch.commit()
     return { success: true, method: { id: ref.id, ...saved } }
   })
@@ -532,7 +712,16 @@ export const removePayoutMethod = (db, methodId) =>
   })
 
 // Adds master-catalogue products to the seller's shop, up to their product limit.
-export const addProductsToShop = (db, sellerId, catalogIds, actorId = sellerId) =>
+// `details` maps a catalogue id to what the admin's feed shows for it: `{ name, image, price }`.
+const productLine = (id, details) =>
+  clean({
+    id,
+    name: text(details?.[id]?.name, 140) || undefined,
+    image: text(details?.[id]?.image, 300) || undefined,
+    price: Number.isFinite(Number(details?.[id]?.price)) ? round2(details[id].price) : undefined,
+  })
+
+export const addProductsToShop = (db, sellerId, catalogIds, actorId = sellerId, details = {}) =>
   attempt(() =>
     runTransaction(db, async (tx) => {
       const shopRef = doc(db, COL.shops, sellerId)
@@ -559,12 +748,14 @@ export const addProductsToShop = (db, sellerId, catalogIds, actorId = sellerId) 
         title: `${toAdd.length} product${toAdd.length === 1 ? '' : 's'} added to shop`,
         entity: shop.fullName,
         icon: 'package',
+        // One line however many products: the feed lists each product from `meta.items`.
+        meta: { items: toAdd.map((id) => productLine(id, details)) },
       })
       return { success: true, added: toAdd.length }
     })
   )
 
-export const removeProductFromShop = (db, sellerId, catalogId) =>
+export const removeProductFromShop = (db, sellerId, catalogId, actorId = sellerId, details = {}) =>
   attempt(() =>
     runTransaction(db, async (tx) => {
       const shopRef = doc(db, COL.shops, sellerId)
@@ -573,6 +764,16 @@ export const removeProductFromShop = (db, sellerId, catalogId) =>
       const shop = shopSnap.data()
       if (shop.allowProductRemoval === false) refuse('Product removal is disabled by admin for your store')
       tx.update(shopRef, { productIds: (shop.productIds || []).filter((id) => id !== catalogId) })
+      stageActivity(db, tx, {
+        adminId: shop.adminId,
+        sellerId,
+        actorId,
+        type: 'seller_product_removed',
+        title: 'Product removed from shop',
+        entity: shop.fullName,
+        icon: 'package',
+        meta: { items: [productLine(catalogId, details)] },
+      })
       return { success: true }
     })
   )
@@ -967,7 +1168,9 @@ export const setOrderStatus = (db, target, orderId, status, actorId) =>
       }
       tx.update(orderRef, orderChanges)
       tx.update(shopRef, shopChanges)
-      stageActivity(db, tx, { adminId: target.adminId, sellerId: target.id, actorId, type: 'order_status_changed', title: `Order marked ${status}`, entity: shop.fullName, icon: 'package' })
+      // The profit released on delivery is a balance change: it carries its amount so the feed can say so.
+      const credited = orderChanges.profitCredited ? order.profit || 0 : undefined
+      stageActivity(db, tx, { adminId: target.adminId, sellerId: target.id, actorId, type: 'order_status_changed', title: `Order marked ${status}`, entity: shop.fullName, icon: 'package', amount: credited, meta: credited ? { credited: true } : undefined })
       if (STATUS_MESSAGES[status]) {
         stageNotification(db, tx, target, { type: 'order', title: `Order ${status.toLowerCase()}`, message: STATUS_MESSAGES[status](order) })
       }
@@ -1004,6 +1207,7 @@ export const processWithdrawal = (db, target, withdrawalId, approve, actorId, { 
         entity: shop.fullName,
         icon: 'wallet',
         amount: request.amount,
+        meta: { method: methodSummary(request.payoutMethod, request.method) },
       })
       stageNotification(db, tx, target, {
         type: 'withdrawal',

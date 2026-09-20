@@ -298,6 +298,23 @@ export function AuthProvider({ children }) {
     shopData.syncAccountEmail(getServices(SELLER_APP).db, shop.id, sellerAuth.email)
   }, [impersonation, shop?.id, shop?.email, sellerAuth.email, sellerAuth.uid])
 
+  // While the storefront is open the seller counts as online in the admin console: a light heartbeat
+  // keeps their last-active time fresh (skipped for an admin looking in through "log in as seller").
+  useEffect(() => {
+    if (!sellerId || !identityReady || impersonation || !shop?.id || shop.id !== sellerId) return undefined
+    const { db } = getServices(SELLER_APP)
+    const beat = () => {
+      if (document.visibilityState === 'visible') shopData.touchLastActive(db, sellerId)
+    }
+    beat()
+    const timer = setInterval(beat, 2 * 60 * 1000)
+    document.addEventListener('visibilitychange', beat)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', beat)
+    }
+  }, [sellerId, identityReady, !!impersonation, shop?.id])
+
   const seller = useMemo(() => (shop ? { ...defaultSeller, ...shop, impersonated: !!impersonation } : defaultSeller), [shop, impersonation])
   const sellerRef = useRef(seller)
   sellerRef.current = seller
@@ -376,6 +393,8 @@ export function AuthProvider({ children }) {
       if (!result.success) return result
       endImpersonation()
       setSellerAuth(authState(result.user))
+      // Signing up signs the seller in: it shows in the admin's login history with the place it came from.
+      shopData.recordSellerLogin(getServices(SELLER_APP).db, result.shop)
       return { success: true, seller: result.shop }
     })
 
@@ -511,7 +530,8 @@ export function AuthProvider({ children }) {
     const problem = needSeller()
     if (problem) return problem
     const replaceIds = method.isDefault ? payoutMethods.filter((item) => item.isDefault).map((item) => item.id) : []
-    return shopData.savePayoutMethod(acting().db, sellerRef.current, method, replaceIds)
+    const { db, actorId } = acting()
+    return shopData.savePayoutMethod(db, sellerRef.current, method, replaceIds, actorId)
   }
 
   const removeSellerPayoutMethod = async (_sellerId, methodId) => shopData.removePayoutMethod(acting().db, methodId)
@@ -545,11 +565,20 @@ export function AuthProvider({ children }) {
     return { used, limit, remaining: Math.max(0, limit - used) }
   }
 
+  // What the admin's activity feed shows for each product: its name, picture and the price it sells at.
+  const productDetails = (ids) =>
+    Object.fromEntries(
+      ids
+        .map((id) => masterCatalog.find((item) => item.id === id))
+        .filter(Boolean)
+        .map((item) => [item.id, { name: item.name, image: item.image, price: item.sell }])
+    )
+
   const addProductsToShop = async (_sellerId, catalogIds) => {
     const problem = needSeller()
     if (problem) return problem
     const { db, actorId } = acting()
-    return shopData.addProductsToShop(db, sellerRef.current.id, catalogIds, actorId)
+    return shopData.addProductsToShop(db, sellerRef.current.id, catalogIds, actorId, productDetails(catalogIds))
   }
 
   const quickAddRandomToShop = async (_sellerId, count = 50) => {
@@ -570,7 +599,8 @@ export function AuthProvider({ children }) {
   const removeProductFromShop = async (_sellerId, catalogId) => {
     const problem = needSeller()
     if (problem) return problem
-    return shopData.removeProductFromShop(acting().db, sellerRef.current.id, catalogId)
+    const { db, actorId } = acting()
+    return shopData.removeProductFromShop(db, sellerRef.current.id, catalogId, actorId, productDetails([catalogId]))
   }
 
   return (

@@ -284,7 +284,8 @@ export function AuthProvider({ children }) {
       clearImpersonation()
       adoptAdminProfile(result.profile)
       setAdminFirebaseUid(result.user.uid)
-      shopData.logAdminLogin(getServices(ADMIN_APP).db, result.user.uid, 'Admin console')
+      // Recorded with the device and place it came from; the place is looked up in the background.
+      shopData.logAdminLogin(getServices(ADMIN_APP).db, result.user.uid, 'Admin console', shopData.sessionDetails())
       return { success: true }
     })
 
@@ -300,7 +301,7 @@ export function AuthProvider({ children }) {
       adoptAdminProfile(result.profile)
       setAdminFirebaseUid(result.user.uid)
       const { db } = getServices(ADMIN_APP)
-      shopData.logAdminLogin(db, result.user.uid, 'Admin console')
+      shopData.logAdminLogin(db, result.user.uid, 'Admin console', shopData.sessionDetails())
       shopData.pushSuperLog(db, {
         superAdminId: result.superAdmin.ownerUid,
         actorId: result.user.uid,
@@ -388,6 +389,19 @@ export function AuthProvider({ children }) {
   const getSellerNotifications = (sellerId) => notificationsBySeller[sellerId] || EMPTY
 
   const getSellerLoginHistory = (sellerId) => (loginsBySeller[sellerId] || EMPTY).slice(0, 50)
+
+  // ---- activity pages (Recent Actions, My Logs) -------------------------------------------------------
+  // They read their own live queries, only while open, so the rest of the console does not pay for them.
+
+  const subscribeData = (name, constraints, onData, onError, map) => shopData.watchList(acting().db, name, constraints, onData, onError, map)
+
+  const watchDeviceLabels = (onData, onError) => shopData.watchDeviceLabels(acting().db, admin.id, onData, onError)
+
+  // A super admin looking in through "log in as admin" cannot name the admin's devices.
+  const saveDeviceLabel = (key, label) =>
+    impersonatedNow ? Promise.resolve({ success: false, error: 'Devices can only be named by the admin themselves.' }) : shopData.saveDeviceLabel(acting().db, admin.id, key, label)
+
+  const backfillLocations = (rows) => shopData.backfillLocations(acting().db, rows)
 
   const getSellerLedger = (sellerId) => ledgerBySeller[sellerId] || EMPTY
 
@@ -574,6 +588,12 @@ export function AuthProvider({ children }) {
         sellersRegistry,
         adminLogs,
         pushAdminLog,
+        dataReady: identityReady,
+        sellerLoginHistory: loginHistory,
+        subscribeData,
+        watchDeviceLabels,
+        saveDeviceLabel,
+        backfillLocations,
         getSellersForAdmin,
         getAllSellersCount,
         getPendingKYCCount,
