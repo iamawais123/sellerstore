@@ -1,9 +1,70 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import SupportChatWidget from './SupportChatWidget'
 
 const SellerLayout = () => {
   const navigate = useNavigate()
-  const { seller, logoutSeller } = useAuth()
+  const { seller, sellerReady, sellerError, logoutSeller, getSellerNotifications } = useAuth()
+
+  // The session and the shop arrive from Firestore, so wait for them instead of bouncing a
+  // signed-in seller to the login page on every reload.
+  if (!sellerReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3 text-gray-500">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-[#0a3d62]" />
+          <p className="text-sm font-semibold">Loading your shop…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!seller?.id) {
+    if (sellerError) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+          <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 text-center shadow-sm">
+            <h1 className="text-xl font-black text-gray-900">We couldn't load your shop</h1>
+            <p className="mt-2 text-gray-500">{sellerError}</p>
+            <button onClick={() => window.location.reload()} className="mt-6 w-full rounded-2xl bg-gray-900 px-5 py-3 font-bold text-white hover:bg-gray-800">
+              Try again
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return <Navigate to="/seller/login" replace />
+  }
+
+  if (seller.deleted || seller.suspended) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+        <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+            <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-black text-gray-900">
+            {seller.deleted ? 'This store has been deleted' : 'Your account is suspended'}
+          </h1>
+          <p className="mt-2 text-gray-500">
+            {seller.deleted
+              ? 'This seller store is no longer active. Contact support if you believe this is a mistake.'
+              : 'Access to your seller dashboard has been temporarily suspended. Contact support for more information.'}
+          </p>
+          <button
+            onClick={() => { logoutSeller(); navigate('/') }}
+            className="mt-6 w-full rounded-2xl bg-gray-900 px-5 py-3 font-bold text-white hover:bg-gray-800"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const unreadNotifications = getSellerNotifications().filter((item) => !item.read).length
 
   const navItems = [
     {
@@ -45,6 +106,7 @@ const SellerLayout = () => {
     {
       to: '/seller/notifications',
       label: 'Notifications',
+      badge: unreadNotifications,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -113,7 +175,12 @@ const SellerLayout = () => {
                   }
                 >
                   <span className="text-gray-500">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge > 0 && (
+                    <span className="min-w-[1.25rem] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-xs font-bold text-white">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                  )}
                 </NavLink>
               </li>
             ))}
@@ -138,6 +205,8 @@ const SellerLayout = () => {
           <Outlet context={{ seller }} />
         </div>
       </main>
+
+      <SupportChatWidget />
     </div>
   )
 }

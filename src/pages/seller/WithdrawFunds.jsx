@@ -1,21 +1,48 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { PasswordField } from '../../components/profile/Sheet'
 
 const WithdrawFunds = () => {
   const navigate = useNavigate()
-  const { seller } = useAuth()
+  const { seller, getSellerWithdrawals, requestSellerWithdrawal, getSellerPayoutMethods, hasTransactionPassword, verifyTransactionPassword } = useAuth()
   const [amount, setAmount] = useState('')
+  const [pin, setPin] = useState('')
+  const [message, setMessage] = useState('')
 
   const available = Number(seller.balance || 0)
   const guarantee = Number(seller.guarantee || 0)
-  const hasPayoutMethod = false
+  const payoutMethods = getSellerPayoutMethods(seller.id)
+  const hasPayoutMethod = payoutMethods.length > 0
   const parsedAmount = parseFloat(amount || '0')
-  const canApply = hasPayoutMethod && parsedAmount > 0 && parsedAmount <= available
+  const canApply = hasPayoutMethod && parsedAmount > 0 && parsedAmount <= available && !seller.withdrawalsBlocked && (!hasTransactionPassword || pin !== '')
 
-  const payoutMethods = []
+  const recentRequests = getSellerWithdrawals(seller.id)
 
-  const recentRequests = []
+  const [messageOk, setMessageOk] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  const submitWithdrawal = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    if (hasTransactionPassword) {
+      const check = await verifyTransactionPassword(pin)
+      if (!check.success) {
+        setSubmitting(false)
+        setMessage(check.error)
+        setMessageOk(false)
+        return
+      }
+    }
+    const result = await requestSellerWithdrawal(seller.id, parsedAmount, payoutMethods[0])
+    setSubmitting(false)
+    setMessage(result.success ? 'Withdrawal submitted for admin review.' : result.error)
+    setMessageOk(result.success)
+    if (result.success) {
+      setAmount('')
+      setPin('')
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -69,7 +96,7 @@ const WithdrawFunds = () => {
                 Save your bank account or USDT wallet for fast payouts.
               </p>
             </div>
-            <button className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-900 font-semibold rounded-xl shadow-sm transition-colors">
+            <button type="button" onClick={() => navigate('/seller/profile')} className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-900 font-semibold rounded-xl shadow-sm transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -151,7 +178,16 @@ const WithdrawFunds = () => {
               </div>
             </div>
 
-            {!hasPayoutMethod && (
+            {seller.withdrawalsBlocked ? (
+              <div className="flex items-start space-x-3 p-4 border border-rose-200 rounded-2xl bg-rose-50">
+                <svg className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+                <p className="text-sm font-medium text-rose-700">
+                  Withdrawals are currently blocked by admin for your store. Contact support for details.
+                </p>
+              </div>
+            ) : !hasPayoutMethod && (
               <div className="flex items-start space-x-3 p-4 border border-dashed border-gray-200 rounded-2xl bg-gray-50/60">
                 <svg className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -162,9 +198,23 @@ const WithdrawFunds = () => {
               </div>
             )}
 
+            {hasTransactionPassword ? (
+              <PasswordField label="Transaction password" value={pin} onChange={setPin} hint="Enter the transaction password you set in Profile → Security to confirm this withdrawal." />
+            ) : (
+              !seller.impersonated && (
+                <p className="text-sm text-gray-500">
+                  Protect your withdrawals with a transaction password.{' '}
+                  <button type="button" onClick={() => navigate('/seller/profile')} className="font-semibold text-[#0a3d62] underline underline-offset-2 hover:text-[#0f4c81]">
+                    Set one up in Profile → Security
+                  </button>
+                </p>
+              )
+            )}
+
             <button
               type="button"
-              disabled={!canApply}
+              disabled={!canApply || submitting}
+              onClick={submitWithdrawal}
               className={`w-full py-4 font-semibold rounded-2xl text-lg transition-all duration-200 ${
                 canApply
                   ? 'bg-gradient-to-r from-[#0a3d62] to-[#1a6fb0] hover:from-[#0f4c81] hover:to-[#2b7fc0] text-white shadow-lg shadow-[#0a3d62]/20 hover:shadow-xl hover:shadow-[#0a3d62]/30'
@@ -173,6 +223,7 @@ const WithdrawFunds = () => {
             >
               Apply for withdrawal
             </button>
+            {message && <p className={`text-center text-sm font-bold ${messageOk ? 'text-emerald-700' : 'text-rose-700'}`}>{message}</p>}
           </div>
         </div>
 

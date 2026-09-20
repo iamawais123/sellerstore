@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 const CustomerLogin = () => {
   const navigate = useNavigate()
+  const { signInCustomer, sendPasswordReset } = useAuth()
   const [form, setForm] = useState({
     email: '',
     password: '',
     remember: true,
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const features = [
     {
@@ -42,10 +47,23 @@ const CustomerLogin = () => {
     },
   ]
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    loginCustomer({ email: form.email })
-    navigate('/')
+    setError('')
+    setNotice('')
+    setSubmitting(true)
+    const result = await signInCustomer({ email: form.email, password: form.password, remember: form.remember })
+    setSubmitting(false)
+    if (result.success) navigate('/')
+    else setError(result.error)
+  }
+
+  const handleForgotPassword = async () => {
+    setError('')
+    setNotice('')
+    const result = await sendPasswordReset('customer', form.email)
+    if (result.success) setNotice(`If an account exists for ${form.email.trim()}, a password reset link is on its way.`)
+    else setError(result.error)
   }
 
   return (
@@ -117,6 +135,17 @@ const CustomerLogin = () => {
             </h1>
             <p className="text-gray-500 mb-8 text-lg">Sign in to your account</p>
 
+            {error && (
+              <div role="alert" className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-sm font-medium text-rose-700">
+                {error}
+              </div>
+            )}
+            {notice && (
+              <div role="status" className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-sm font-medium text-emerald-700">
+                {notice}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
@@ -168,12 +197,13 @@ const CustomerLogin = () => {
                   </button>
                 </div>
                 <div className="flex justify-end mt-2">
-                  <a
-                    href="#"
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
                     className="text-sm font-medium text-gray-700 hover:text-[#4c1d95] transition-colors"
                   >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
               </div>
 
@@ -191,9 +221,10 @@ const CustomerLogin = () => {
 
               <button
                 type="submit"
-                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-2xl shadow-lg shadow-slate-900/20 transition-all duration-200 hover:shadow-xl hover:shadow-slate-900/30 text-lg"
+                disabled={submitting}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-2xl shadow-lg shadow-slate-900/20 transition-all duration-200 hover:shadow-xl hover:shadow-slate-900/30 text-lg disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Sign In
+                {submitting ? 'Signing in…' : 'Sign In'}
               </button>
             </form>
 

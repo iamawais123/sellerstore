@@ -1,13 +1,20 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useAuth } from '../../context/AuthContext'
+import { openSupportChat } from '../../components/SupportChatWidget'
 
 const SellerNotifications = () => {
+  const { seller, getSellerNotifications, markNotificationRead, markAllNotificationsRead } = useAuth()
   const [activeTab, setActiveTab] = useState('all')
 
-  const counts = {
-    all: 0,
-    unread: 0,
-    read: 0,
-  }
+  const notifications = getSellerNotifications(seller.id)
+
+  const counts = useMemo(() => ({
+    all: notifications.length,
+    unread: notifications.filter((item) => !item.read).length,
+    read: notifications.filter((item) => item.read).length,
+  }), [notifications])
+
+  const visible = notifications.filter((item) => activeTab === 'all' || (activeTab === 'unread' ? !item.read : item.read))
 
   const tabs = [
     { id: 'all', label: 'All', count: counts.all },
@@ -17,6 +24,13 @@ const SellerNotifications = () => {
 
   return (
     <div className="space-y-6">
+      {counts.unread > 0 && (
+        <div className="flex justify-end">
+          <button onClick={() => markAllNotificationsRead(seller.id)} className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
+            Mark all as read
+          </button>
+        </div>
+      )}
       <div className="bg-gray-50 rounded-2xl p-1.5">
         <div className="grid grid-cols-3 gap-1">
           {tabs.map((tab) => (
@@ -41,6 +55,27 @@ const SellerNotifications = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 lg:p-16 min-h-[400px]">
+        {visible.length > 0 ? (
+          <div className="space-y-3">
+            {visible.map((notification) => (
+              <button
+                key={notification.id}
+                onClick={() => {
+                  // A chat note opens the chat popup, which reads the whole conversation.
+                  if (notification.type === 'chat') openSupportChat()
+                  else if (!notification.read) markNotificationRead(seller.id, notification.id)
+                }}
+                className={`w-full rounded-2xl border p-4 text-left transition-colors ${notification.read ? 'border-gray-100 bg-gray-50' : 'border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50'}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div><h3 className="font-bold text-gray-900">{notification.title}</h3><p className="mt-1 text-sm text-gray-600">{notification.message}</p></div>
+                  {!notification.read && <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-1 text-xs font-bold text-indigo-700">New</span>}
+                </div>
+                <p className="mt-2 text-xs font-semibold text-gray-400">{notification.time}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
         <div className="text-center py-8">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-gray-50">
             <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -54,6 +89,7 @@ const SellerNotifications = () => {
             We'll notify you the moment you get an order or payout.
           </p>
         </div>
+        )}
       </div>
     </div>
   )

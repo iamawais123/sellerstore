@@ -4,12 +4,15 @@ import { useAuth } from '../../context/AuthContext'
 
 const SellerLogin = () => {
   const navigate = useNavigate()
-  const { loginSeller } = useAuth()
+  const { signInSeller, sendPasswordReset } = useAuth()
   const [form, setForm] = useState({
     email: '',
     password: '',
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const features = [
     {
@@ -41,12 +44,26 @@ const SellerLogin = () => {
     },
   ]
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    loginSeller({
+    setError('')
+    setNotice('')
+    setSubmitting(true)
+    const result = await signInSeller({
       email: form.email,
+      password: form.password,
     })
-    navigate('/seller/dashboard')
+    setSubmitting(false)
+    if (result.success) navigate('/seller/dashboard')
+    else setError(result.error)
+  }
+
+  const handleForgotPassword = async () => {
+    setError('')
+    setNotice('')
+    const result = await sendPasswordReset('seller', form.email)
+    if (result.success) setNotice(`If a seller account exists for ${form.email.trim()}, a password reset link is on its way.`)
+    else setError(result.error)
   }
 
   return (
@@ -127,6 +144,8 @@ const SellerLogin = () => {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700">{error}</p>}
+              {notice && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">{notice}</p>}
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Email address
@@ -181,13 +200,23 @@ const SellerLogin = () => {
                     )}
                   </button>
                 </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-sm font-medium text-gray-700 hover:text-[#0a3d62] transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-4 bg-gradient-to-r from-[#0a3d62] to-[#1a6fb0] hover:from-[#0f4c81] hover:to-[#2b7fc0] text-white font-semibold rounded-2xl shadow-lg shadow-[#0a3d62]/20 transition-all duration-200 hover:shadow-xl hover:shadow-[#0a3d62]/30 text-lg"
+                disabled={submitting}
+                className="w-full py-4 bg-gradient-to-r from-[#0a3d62] to-[#1a6fb0] hover:from-[#0f4c81] hover:to-[#2b7fc0] text-white font-semibold rounded-2xl shadow-lg shadow-[#0a3d62]/20 transition-all duration-200 hover:shadow-xl hover:shadow-[#0a3d62]/30 text-lg disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Sign in to your shop
+                {submitting ? 'Signing in…' : 'Sign in to your shop'}
               </button>
             </form>
 

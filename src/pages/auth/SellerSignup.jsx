@@ -1,33 +1,40 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { prepareKycDocument } from '../../data/kycDocument'
 
 const SellerSignup = () => {
   const navigate = useNavigate()
-  const { loginSeller } = useAuth()
+  const { registerSeller, findAdminByInviteCode } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 3
 
   const [form, setForm] = useState({
     fullName: '',
-    email: 'YRHQEG3L',
+    email: '',
     inviteCode: '',
     password: '',
     confirmPassword: '',
     shopName: '',
     country: 'India',
     streetAddress: '',
-    city: 'Mumbai',
-    state: 'Maharashtra',
+    city: '',
+    state: '',
     documentType: 'national-id',
     frontFile: null,
     backFile: null,
     agreeTerms: false,
   })
+  const [submitting, setSubmitting] = useState(false)
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [showWarning, setShowWarning] = useState(false)
+  const [warningText, setWarningText] = useState('')
+  const [submitError, setSubmitError] = useState('')
+  // Result of the last invite-code lookup, tagged with the code it belongs to so a stale answer
+  // is never shown for a code that has since been edited.
+  const [lookup, setLookup] = useState({ code: '', admin: null })
 
   const stepTitles = {
     1: 'Account details',
@@ -63,12 +70,6 @@ const SellerSignup = () => {
       title: 'Admin-backed',
       desc: 'Personal admin handles fulfillment',
     },
-  ]
-
-  const stats = [
-    { value: '10K+', label: 'Active sellers' },
-    { value: '$2M+', label: 'Paid out' },
-    { value: '24/7', label: 'Support' },
   ]
 
   const countries = [
@@ -113,18 +114,41 @@ const SellerSignup = () => {
   ]
 
   const uploadRequirements = [
-    'JPG, PNG, WEBP, or PDF — up to 10MB per file',
-    'Large photos are compressed before upload to avoid slow network failures',
+    'JPG, PNG or WEBP photos of any size — they are compressed automatically',
+    'PDF is also accepted, but only up to about 330 KB — prefer a photo or scan',
   ]
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
-  const step1Valid = () =>
-    form.fullName.trim() !== '' &&
-    form.email.trim() !== '' &&
-    form.inviteCode.trim() !== '' &&
-    form.password !== '' &&
-    form.confirmPassword !== ''
+  const trimmedCode = form.inviteCode.trim()
+  const matchedAdmin = trimmedCode !== '' && lookup.code === trimmedCode ? lookup.admin : null
+  const codeCheckPending = trimmedCode !== '' && lookup.code !== trimmedCode
+  const codeRejected = trimmedCode !== '' && !codeCheckPending && !matchedAdmin
+
+  useEffect(() => {
+    if (!trimmedCode) return undefined
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const admin = await findAdminByInviteCode(trimmedCode)
+      if (!cancelled) setLookup({ code: trimmedCode, admin })
+    }, 350)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [trimmedCode])
+
+  const step1Problem = () => {
+    if (!form.fullName.trim() || !form.email.trim() || !trimmedCode || !form.password || !form.confirmPassword) {
+      return 'Please complete all fields, including a valid invitation code.'
+    }
+    if (!matchedAdmin) return codeCheckPending ? 'Still checking your invitation code — try again in a moment.' : 'That invitation code is not valid. Ask your admin for their exact code.'
+    if (form.password.length < 6) return 'Password must be at least 6 characters.'
+    if (form.password !== form.confirmPassword) return 'Passwords do not match.'
+    return ''
+  }
+
+  const step1Valid = () => step1Problem() === ''
 
   const step2Valid = () =>
     form.shopName.trim() !== '' &&
@@ -142,11 +166,13 @@ const SellerSignup = () => {
   const nextStep = (e) => {
     e.preventDefault()
     if (currentStep === 1 && !step1Valid()) {
+      setWarningText(step1Problem())
       setShowWarning(true)
       setTimeout(() => setShowWarning(false), 3000)
       return
     }
     if (currentStep === 2 && !step2Valid()) {
+      setWarningText('Please complete all fields.')
       setShowWarning(true)
       setTimeout(() => setShowWarning(false), 3000)
       return
@@ -165,19 +191,46 @@ const SellerSignup = () => {
     }
   }
 
-  const handleFinalSubmit = (e) => {
+  const handleFinalSubmit = async (e) => {
     e.preventDefault()
     if (!step3Valid()) {
+      setWarningText('Please complete all fields.')
       setShowWarning(true)
       setTimeout(() => setShowWarning(false), 3000)
       return
     }
-    loginSeller({
+    setSubmitError('')
+    setSubmitting(true)
+    let front
+    let back
+    try {
+      ;[front, back] = await Promise.all([prepareKycDocument(form.frontFile), prepareKycDocument(form.backFile)])
+    } catch (error) {
+      setSubmitting(false)
+      setSubmitError(error.message || 'Could not read your identity documents.')
+      return
+    }
+    const result = await registerSeller({
       fullName: form.fullName,
       shopName: form.shopName || 'My Shop',
       email: form.email,
+      password: form.password,
+      inviteCode: form.inviteCode,
+      country: form.country,
+      streetAddress: form.streetAddress,
+      city: form.city,
+      state: form.state,
+      documentType: form.documentType,
+      documents: { front, back },
     })
-    navigate('/seller/dashboard')
+    setSubmitting(false)
+    if (result.success) {
+      navigate('/seller/dashboard')
+      return
+    }
+    setSubmitError(result.error)
+    // Problems with the email, password or invite code live on the first step.
+    if (/email|invitation|password/i.test(result.error)) setCurrentStep(1)
   }
 
   const handleFileUpload = (key, e) => {
@@ -205,7 +258,7 @@ const SellerSignup = () => {
           <div>
             <p className="text-xl font-bold">Seller Portal</p>
             <p className="text-xs uppercase tracking-widest text-blue-200 font-semibold">
-              E Seller Store
+              U Seller Store
             </p>
           </div>
         </div>
@@ -241,15 +294,6 @@ const SellerSignup = () => {
             </li>
           ))}
         </ul>
-
-        <div className="grid grid-cols-3 gap-4 max-w-lg">
-          {stats.map((s, i) => (
-            <div key={i} className="border-l-2 border-white/20 pl-4">
-              <p className="text-3xl xl:text-4xl font-bold text-white">{s.value}</p>
-              <p className="text-sm text-blue-200 mt-1">{s.label}</p>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )
@@ -281,7 +325,7 @@ const SellerSignup = () => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         ),
-        disabled: true,
+        disabled: false,
         highlight: true,
       },
       {
@@ -336,6 +380,15 @@ const SellerSignup = () => {
 
     return (
       <div className="space-y-5">
+        {showWarning && (
+          <div className="flex items-start space-x-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl">
+            <svg className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-sm font-medium text-rose-700">{warningText || 'Please complete all fields, including a valid invitation code.'}</p>
+          </div>
+        )}
+
         {fields.map((field) => (
           <div key={field.name}>
             <label className="block text-sm font-semibold text-gray-900 mb-2">{field.label}</label>
@@ -348,7 +401,13 @@ const SellerSignup = () => {
                 disabled={field.disabled}
                 onChange={(e) => update(field.name, e.target.value)}
                 className={`w-full pl-12 pr-12 py-3.5 border-2 rounded-2xl text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none ${
-                  field.highlight
+                  field.name === 'inviteCode'
+                    ? matchedAdmin
+                      ? 'bg-emerald-50/60 border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                      : codeRejected
+                      ? 'bg-amber-50/50 border-amber-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10'
+                      : 'bg-white border-gray-100 focus:border-[#0a3d62] focus:ring-4 focus:ring-[#0a3d62]/10'
+                    : field.highlight
                     ? 'bg-blue-50/60 border-blue-100 focus:border-[#0a3d62] focus:ring-4 focus:ring-[#0a3d62]/10'
                     : 'bg-white border-gray-100 focus:border-[#0a3d62] focus:ring-4 focus:ring-[#0a3d62]/10'
                 } ${field.disabled ? 'cursor-not-allowed opacity-90' : ''}`}
@@ -371,9 +430,73 @@ const SellerSignup = () => {
                   )}
                 </button>
               )}
+              {field.name === 'inviteCode' && matchedAdmin && (
+                <span className="absolute right-14 top-1/2 -translate-y-1/2">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              )}
+              {field.name === 'inviteCode' && codeRejected && (
+                <span className="absolute right-14 top-1/2 -translate-y-1/2">
+                  <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </span>
+              )}
             </div>
           </div>
         ))}
+
+        {matchedAdmin ? (
+          <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-2xl">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow shrink-0">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-emerald-900 text-sm leading-tight">Invite code verified</p>
+                <p className="text-sm text-emerald-800 font-semibold mt-0.5">
+                  You'll be assigned to admin <span className="font-black">{matchedAdmin.fullName}</span> for onboarding, payouts and support.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : codeRejected ? (
+          <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-2xl">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow shrink-0">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-amber-900 text-sm leading-tight">Invite code not recognized</p>
+                <p className="text-sm text-amber-800 font-semibold mt-0.5">
+                  Ask your assigned admin for their exact invite code (e.g. <span className="font-mono bg-white px-1.5 py-0.5 rounded">AB12CD34</span>).
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-2xl">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-100 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm leading-tight">Invitation code required</p>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  Get a code from your admin — it links your shop to their management queue.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -656,7 +779,7 @@ const SellerSignup = () => {
   }
 
   const isFinalStep = currentStep === totalSteps
-  const primaryButtonLabel = isFinalStep ? 'Create my shop' : 'Continue'
+  const primaryButtonLabel = isFinalStep ? (submitting ? 'Creating your shop…' : 'Create my shop') : 'Continue'
   const handlePrimary = isFinalStep ? handleFinalSubmit : nextStep
 
   return (
@@ -695,6 +818,15 @@ const SellerSignup = () => {
             </div>
 
             <form onSubmit={handlePrimary} className="space-y-6">
+              {submitError && (
+                <div role="alert" className="flex items-start space-x-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl">
+                  <svg className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <p className="text-sm font-medium text-rose-700">{submitError}</p>
+                </div>
+              )}
+
               {renderFormContent()}
 
               {currentStep > 1 || currentStep < totalSteps ? (
@@ -712,8 +844,9 @@ const SellerSignup = () => {
                   )}
                   <button
                     type="submit"
+                    disabled={submitting}
                     className={`w-full py-3.5 text-white font-semibold rounded-2xl transition-all duration-200 ${
-                      canContinue
+                      canContinue && !submitting
                         ? 'bg-gradient-to-r from-[#0a3d62] to-[#1a6fb0] hover:from-[#0f4c81] hover:to-[#2b7fc0] shadow-lg shadow-[#0a3d62]/20 hover:shadow-xl hover:shadow-[#0a3d62]/30'
                         : 'bg-slate-400 cursor-not-allowed shadow-none'
                     }`}
@@ -724,8 +857,9 @@ const SellerSignup = () => {
               ) : (
                 <button
                   type="submit"
+                  disabled={submitting}
                   className={`w-full mt-2 py-4 text-white font-semibold rounded-2xl transition-all duration-200 ${
-                    canContinue
+                    canContinue && !submitting
                       ? 'bg-gradient-to-r from-[#0a3d62] to-[#1a6fb0] hover:from-[#0f4c81] hover:to-[#2b7fc0] shadow-lg shadow-[#0a3d62]/20 hover:shadow-xl hover:shadow-[#0a3d62]/30'
                       : 'bg-slate-400 cursor-not-allowed shadow-none'
                   }`}

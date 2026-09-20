@@ -1,0 +1,541 @@
+rules_version = '2';
+
+// Account graph for the four roles (customer, seller, admin, super admin) plus the shop data that
+// flows between them.
+//
+//   users/{uid}          profile + role for every Firebase Auth account
+//   inviteCodes/{CODE}   who owns an admin / super-admin invite code (readable by exact code only)
+//   meta/bootstrap       written once, by the first super admin — closes open registration
+//
+//   shops/{sellerId}     the seller's shop: balance, guarantee, KYC status, limits, catalogue
+//   kycDocuments/{id}    the identity images a seller uploaded at sign-up (one doc per seller)
+//   orders, withdrawals, notifications, payoutMethods, supportConversations, ledger, campaigns,
+//   loginHistory, activityLogs      every doc carries `sellerId` and the owning admin's `adminId`
+//   superAdminLogs, adminLoginHistory   super-admin console audit trail
+//
+// Who may do what: a seller reads and writes their own shop data; an admin manages the sellers who
+// joined through their invite code (`adminId == their uid`); a super admin manages everything.
+// Money only moves through paired writes (an order payment or a withdrawal request changes the
+// seller's balance in the same batch), which these rules cross-check with getAfter().
+//
+// Password handling never touches Firestore: credentials live in Firebase Auth only.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers ------------------------------------------------------------------------
+
+    function signedIn() { return request.auth != null; }
+
+    function profilePath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function invitePath(code) { return /databases/$(database)/documents/inviteCodes/$(code); }
+    function bootstrapPath() { return /databases/$(database)/documents/meta/bootstrap; }
+
+    function hasProfile() { return signedIn() && exists(profilePath(request.auth.uid)); }
+    function me() { return get(profilePath(request.auth.uid)).data; }
+    function myRole() { return hasProfile() ? me().role : ''; }
+
+    function isSuperAdmin() {
+      return myRole() == 'superadmin' && me().get('removed', false) != true;
+    }
+
+    function isAdmin() {
+      return myRole() == 'admin' && me().get('removed', false) != true;
+    }
+
+    // The caller is the super admin, or the admin who owns the document's `adminId` (the admin a seller
+    // joined through). These take no argument on purpose: a list query is checked without a concrete
+    // document, and an argument like `resource.data.adminId` would be evaluated *before* the super
+    // admin short-circuit and make an unfiltered super-admin query fail.
+    function managesDoc() {
+      return isSuperAdmin() || (isAdmin() && resource.data.adminId == request.auth.uid);
+    }
+    function managesNew() {
+      return isSuperAdmin() || (isAdmin() && request.resource.data.adminId == request.auth.uid);
+    }
+
+    // The invite code exists, belongs to `ownerUid` with role `ownerRole`, and hasn't been disabled
+    // (a super admin disables the codes of removed admins / super admins).
+    function inviteIsLive(code, ownerRole, ownerUid) {
+      return exists(invitePath(code))
+        && get(invitePath(code)).data.ownerRole == ownerRole
+        && get(invitePath(code)).data.ownerUid == ownerUid
+        && get(invitePath(code)).data.get('disabled', false) != true;
+    }
+
+    // ---- self-registration shapes -------------------------------------------------------
+    // Each shape pins the exact keys a visitor may write, so nobody can register themselves with
+    // extra powers (e.g. `removed`, a different role, or someone else's adminId).
+
+    function selfCustomer(d) {
+      return d.role == 'customer'
+        && d.keys().hasOnly(['role', 'fullName', 'email', 'createdAt'])
+        && d.keys().hasAll(['role', 'fullName', 'email']);
+    }
+
+    // A seller must present a live invite code of the admin they claim as their own.
+    function selfSeller(d) {
+      return d.role == 'seller'
+        && d.keys().hasOnly(['role', 'fullName', 'email', 'shopName', 'adminId', 'inviteCode', 'country',
+                             'streetAddress', 'city', 'state', 'documentType', 'createdAt', 'memberSince'])
+        && d.keys().hasAll(['role', 'fullName', 'email', 'shopName', 'adminId', 'inviteCode'])
+        && inviteIsLive(d.inviteCode, 'admin', d.adminId);
+    }
+
+    // An admin must present a live invite code of the super admin they claim as their own
+    // (`registeredWithCode`); `inviteCode` is the admin's own code for onboarding sellers.
+    function selfAdmin(d) {
+      return d.role == 'admin'
+        && d.keys().hasOnly(['role', 'fullName', 'email', 'inviteCode', 'superAdminId', 'registeredWithCode',
+                             'memberSince', 'createdAt', 'lastLoginAt', 'removed'])
+        && d.keys().hasAll(['role', 'fullName', 'email', 'inviteCode', 'superAdminId', 'registeredWithCode'])
+        && d.get('removed', false) == false
+        && inviteIsLive(d.registeredWithCode, 'superadmin', d.superAdminId);
+    }
+
+    // Only the very first super admin can self-register: the same batch must create meta/bootstrap,
+    // which can only be created while it doesn't exist yet.
+    function selfSuperAdmin(d) {
+      return d.role == 'superadmin'
+        && d.keys().hasOnly(['role', 'fullName', 'email', 'inviteCode', 'memberSince', 'createdAt',
+                             'lastLoginAt', 'createdBy', 'removed'])
+        && d.keys().hasAll(['role', 'fullName', 'email', 'inviteCode'])
+        && d.get('removed', false) == false
+        && !exists(bootstrapPath())
+        && existsAfter(bootstrapPath());
+    }
+
+    // Accounts a super admin creates for someone else (admins and further super admins).
+    function provisionedAccount(d) {
+      return isSuperAdmin()
+        && d.role in ['admin', 'superadmin']
+        && d.keys().hasOnly(['role', 'fullName', 'email', 'inviteCode', 'superAdminId', 'memberSince', 'createdAt',
+                             'lastLoginAt', 'createdBy', 'removed'])
+        && d.get('removed', false) == false;
+    }
+
+    // ---- users ---------------------------------------------------------------------------
+
+    match /users/{uid} {
+      // Own profile; a super admin reads everyone; an admin reads the sellers who joined through
+      // their invite code and the super admin who invited them.
+      allow get: if signedIn() && (
+        request.auth.uid == uid
+        || isSuperAdmin()
+        || (myRole() == 'admin' && (
+              (resource.data.role == 'seller' && resource.data.adminId == request.auth.uid)
+              || (resource.data.role == 'superadmin' && uid == me().get('superAdminId', '')))));
+
+      allow list: if signedIn() && (
+        isSuperAdmin()
+        || (myRole() == 'admin' && resource.data.role == 'seller' && resource.data.adminId == request.auth.uid));
+
+      allow create: if signedIn() && (
+        (request.auth.uid == uid
+          && request.resource.data.email == request.auth.token.email
+          && (selfCustomer(request.resource.data)
+              || selfSeller(request.resource.data)
+              || selfAdmin(request.resource.data)
+              || selfSuperAdmin(request.resource.data)))
+        || (request.auth.uid != uid && provisionedAccount(request.resource.data)));
+
+      // Owners can touch a few harmless fields (only admins / super admins may change their invite
+      // code; `email` may only follow the address Firebase Auth holds for them); role, links between
+      // accounts and `removed` are super-admin territory.
+      allow update: if signedIn() && (
+        (request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'lastLoginAt', 'inviteCode', 'email'])
+          && (resource.data.role in ['admin', 'superadmin']
+              || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['inviteCode']))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email'])
+              || request.resource.data.email == request.auth.token.email))
+        || (isSuperAdmin()
+          && resource.data.role in ['admin', 'superadmin']
+          && request.resource.data.role == resource.data.role));
+
+      allow delete: if false;
+    }
+
+    // ---- invite codes --------------------------------------------------------------------
+
+    match /inviteCodes/{code} {
+      // Sign-up forms validate a code by fetching it; listing codes is never allowed.
+      allow get: if true;
+      allow list: if false;
+
+      // A code is created in the same batch that points the owner's profile at it, so the profile
+      // (role, name, code) is the source of truth for what may be written here.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ownerUid', 'ownerRole', 'ownerName', 'disabled', 'createdAt'])
+        && request.resource.data.ownerRole in ['admin', 'superadmin']
+        && request.resource.data.get('disabled', false) == false
+        && (request.auth.uid == request.resource.data.ownerUid || isSuperAdmin())
+        && existsAfter(profilePath(request.resource.data.ownerUid))
+        && getAfter(profilePath(request.resource.data.ownerUid)).data.role == request.resource.data.ownerRole
+        && getAfter(profilePath(request.resource.data.ownerUid)).data.inviteCode == code
+        && getAfter(profilePath(request.resource.data.ownerUid)).data.fullName == request.resource.data.ownerName
+        && getAfter(profilePath(request.resource.data.ownerUid)).data.get('removed', false) != true;
+
+      // Removing / restoring an account disables / re-enables its code.
+      allow update: if isSuperAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']);
+
+      allow delete: if signedIn() && (resource.data.ownerUid == request.auth.uid || isSuperAdmin());
+    }
+
+    // ---- bootstrap flag -------------------------------------------------------------------
+
+    match /meta/bootstrap {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && !exists(bootstrapPath())
+        && request.resource.data.keys().hasOnly(['superAdminUid', 'createdAt'])
+        && request.resource.data.superAdminUid == request.auth.uid
+        && existsAfter(profilePath(request.auth.uid))
+        && getAfter(profilePath(request.auth.uid)).data.role == 'superadmin';
+      allow update, delete: if false;
+    }
+
+    // ==== shop data ==========================================================================
+
+    function shopPath(sellerId) { return /databases/$(database)/documents/shops/$(sellerId); }
+    function shopOf(sellerId) { return get(shopPath(sellerId)).data; }
+    function shopAfter(sellerId) { return getAfter(shopPath(sellerId)).data; }
+    function shopOpen(shop) { return shop.get('suspended', false) != true && shop.get('deleted', false) != true; }
+    function sameMoney(a, b) { return math.abs(a - b) < 0.005; }
+    function diffKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // The caller is the seller themself, or (a "log in as seller" session, or an admin doing their
+    // job) the admin / super admin who manages that seller.
+    function actsForDoc() { return request.auth.uid == resource.data.sellerId || managesDoc(); }
+    function actsForNew() { return request.auth.uid == request.resource.data.sellerId || managesNew(); }
+
+    // What a seller may write about themself on their shop (Profile page): names, phone, address, the
+    // SEO title/description, a small avatar image, and an email that must match their Firebase Auth email.
+    function textWithin(d, key, max) { return d.get(key, '') is string && d.get(key, '').size() <= max; }
+    function validSellerProfile(d) {
+      return d.shopName is string && d.shopName.size() > 0 && d.shopName.size() <= 80
+        && d.fullName is string && d.fullName.size() > 0 && d.fullName.size() <= 80
+        && textWithin(d, 'ownerName', 80)
+        && textWithin(d, 'phone', 30)
+        && textWithin(d, 'phoneCountry', 2)
+        && textWithin(d, 'metaTitle', 60)
+        && textWithin(d, 'metaDescription', 160)
+        && textWithin(d, 'avatar', 80000)
+        && (!diffKeys().hasAny(['email']) || d.email == request.auth.token.email)
+        && (!diffKeys().hasAny(['address'])
+            || (d.address is map
+                && d.address.keys().hasOnly(['street', 'city', 'state', 'country', 'postalCode'])
+                && textWithin(d.address, 'street', 200)
+                && textWithin(d.address, 'city', 80)
+                && textWithin(d.address, 'state', 80)
+                && textWithin(d.address, 'country', 80)
+                && textWithin(d.address, 'postalCode', 20)));
+    }
+
+    // A seller (re)submitting identity documents: only while unverified and either rejected or without
+    // documents yet, and only to put the review back to "Pending".
+    function kycResubmission() {
+      return resource.data.verified == false
+        && (resource.data.kyc.status == 'Rejected' || resource.data.kyc.get('hasDocuments', false) != true)
+        && request.resource.data.kyc.status == 'Pending'
+        && request.resource.data.kyc.hasDocuments == true
+        && request.resource.data.kyc.diff(resource.data.kyc).affectedKeys().hasOnly(['status', 'docType', 'submittedAt', 'hasDocuments']);
+    }
+
+    // ---- shops ---------------------------------------------------------------------------------
+
+    match /shops/{shopId} {
+      allow get: if signedIn() && (request.auth.uid == shopId || managesDoc());
+      allow list: if signedIn() && managesDoc();
+
+      // A shop is created by its seller, in the same batch as (or after) their seller profile, and
+      // always starts empty: no balance, unverified, default limits.
+      allow create: if signedIn() && request.auth.uid == shopId
+        && request.resource.data.keys().hasOnly(['fullName', 'ownerName', 'shopName', 'email', 'adminId', 'inviteCode',
+                                                 'memberSince', 'createdAt', 'lastActiveAt', 'balance', 'guarantee', 'rating',
+                                                 'verified', 'status', 'deleted', 'suspended', 'withdrawalsBlocked',
+                                                 'allowProductRemoval', 'productLimit', 'viewsBoost', 'kycAckSeen',
+                                                 'productIds', 'orderStats', 'views', 'kyc'])
+        && request.resource.data.keys().hasAll(['fullName', 'shopName', 'email', 'adminId', 'balance', 'verified', 'kyc'])
+        && request.resource.data.balance == 0
+        && request.resource.data.guarantee == 0
+        && request.resource.data.get('rating', 5) == 5
+        && request.resource.data.verified == false
+        && request.resource.data.get('status', 'Under review') == 'Under review'
+        && request.resource.data.get('deleted', false) == false
+        && request.resource.data.get('suspended', false) == false
+        && request.resource.data.get('withdrawalsBlocked', false) == false
+        && request.resource.data.get('allowProductRemoval', true) == true
+        && request.resource.data.get('productLimit', 50) == 50
+        && request.resource.data.get('viewsBoost', 0) == 0
+        && request.resource.data.get('kycAckSeen', false) == false
+        && request.resource.data.get('productIds', []).size() == 0
+        && request.resource.data.get('orderStats', {'total': 0, 'pending': 0, 'delivered': 0}) == {'total': 0, 'pending': 0, 'delivered': 0}
+        && request.resource.data.get('views', {'total': 0, 'today': 0}) == {'total': 0, 'today': 0}
+        && request.resource.data.kyc.status == 'Pending'
+        && existsAfter(profilePath(shopId))
+        && getAfter(profilePath(shopId)).data.role == 'seller'
+        && getAfter(profilePath(shopId)).data.get('adminId', '') == request.resource.data.adminId;
+
+      allow update: if signedIn() && (
+        // The seller: note when they were last active, dismiss the "KYC approved" notice, edit their own
+        // profile details, (re)submit identity documents, manage their catalogue, and spend — their
+        // balance can only ever go down (the order-payment and withdrawal rules below pin the exact amount).
+        (request.auth.uid == shopId && (
+          diffKeys().hasOnly(['lastActiveAt', 'kycAckSeen'])
+          || (diffKeys().hasOnly(['shopName', 'fullName', 'ownerName', 'email', 'phone', 'phoneCountry', 'address',
+                                  'metaTitle', 'metaDescription', 'avatar'])
+              && validSellerProfile(request.resource.data))
+          || (diffKeys().hasOnly(['kyc']) && kycResubmission())
+          || (diffKeys().hasOnly(['balance'])
+              && request.resource.data.balance < resource.data.balance
+              && request.resource.data.balance >= 0)
+          || (diffKeys().hasOnly(['productIds'])
+              && resource.data.verified == true
+              && shopOpen(resource.data)
+              && request.resource.data.productIds.size() <= resource.data.productLimit
+              && (resource.data.get('allowProductRemoval', true) == true
+                  || request.resource.data.productIds.hasAll(resource.data.get('productIds', []))))))
+        // The admin who owns the seller (or a super admin): everything an admin console edits.
+        || (managesDoc()
+            && diffKeys().hasOnly(['balance', 'guarantee', 'rating', 'verified', 'status', 'deleted', 'suspended',
+                                   'withdrawalsBlocked', 'allowProductRemoval', 'productLimit', 'viewsBoost',
+                                   'orderStats', 'views', 'kyc', 'lastActiveAt', 'kycAckSeen', 'productIds'])
+            && request.resource.data.balance >= 0
+            && request.resource.data.guarantee >= 0
+            && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
+            && request.resource.data.productLimit >= 0));
+
+      allow delete: if false;
+    }
+
+    // ---- KYC documents -------------------------------------------------------------------------
+    // Two compressed images (base64) submitted with the seller's sign-up. Only the seller and the
+    // admin who reviews them can read them, and nobody can list them.
+
+    match /kycDocuments/{sellerId} {
+      allow get: if signedIn() && (request.auth.uid == sellerId || managesDoc());
+      allow list: if false;
+      allow create: if signedIn() && request.auth.uid == sellerId
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'front', 'back', 'updatedAt'])
+        && request.resource.data.sellerId == sellerId
+        && request.resource.data.front is string && request.resource.data.front.size() <= 460000
+        && request.resource.data.back is string && request.resource.data.back.size() <= 460000
+        && existsAfter(shopPath(sellerId))
+        && shopAfter(sellerId).adminId == request.resource.data.adminId;
+      // Resubmitting after a rejection (or a first submission for a shop that has none): the same batch
+      // must put the shop's review back to "Pending".
+      allow update: if signedIn() && request.auth.uid == sellerId
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'front', 'back', 'updatedAt'])
+        && request.resource.data.sellerId == sellerId
+        && request.resource.data.adminId == resource.data.adminId
+        && request.resource.data.front is string && request.resource.data.front.size() <= 460000
+        && request.resource.data.back is string && request.resource.data.back.size() <= 460000
+        && shopOf(sellerId).kyc.status == 'Rejected'
+        && shopAfter(sellerId).kyc.status == 'Pending';
+      allow delete: if false;
+    }
+
+    // ---- orders --------------------------------------------------------------------------------
+    // An admin gives a verified seller an order; the seller pays the cost from their balance; the
+    // admin moves it through delivery.
+
+    match /orders/{orderId} {
+      allow get, list: if signedIn() && (resource.data.sellerId == request.auth.uid || managesDoc());
+
+      allow create: if signedIn() && managesNew()
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'sellerName', 'shopName', 'items', 'customer', 'status',
+                                                 'createdAt', 'scheduledFor', 'total', 'cost', 'profit', 'productName',
+                                                 'customerName', 'qty', 'time'])
+        && request.resource.data.status == 'Unpaid'
+        && request.resource.data.items is list && request.resource.data.items.size() > 0
+        && request.resource.data.total is number && request.resource.data.cost is number && request.resource.data.profit is number
+        && request.resource.data.cost >= 0
+        && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId
+        && shopOf(request.resource.data.sellerId).verified == true
+        && shopOpen(shopOf(request.resource.data.sellerId));
+
+      allow update: if signedIn() && (
+        // The seller pays for the order: their balance drops by exactly its cost, in the same batch.
+        (resource.data.sellerId == request.auth.uid
+          && resource.data.status == 'Unpaid'
+          && request.resource.data.status == 'Paid'
+          && diffKeys().hasOnly(['status', 'paidAt'])
+          && shopOpen(shopOf(resource.data.sellerId))
+          && shopOf(resource.data.sellerId).balance >= resource.data.cost
+          && sameMoney(shopAfter(resource.data.sellerId).balance, shopOf(resource.data.sellerId).balance - resource.data.cost))
+        // The admin moves it along (pickup, delivery, ...) — or pays on the seller's behalf.
+        || (managesDoc()
+            && diffKeys().hasOnly(['status', 'updatedAt', 'paidAt', 'profitCredited'])
+            && request.resource.data.status in ['Unpaid', 'Paid', 'Pickup', 'On the way', 'Out for delivery', 'Delivered', 'Cancelled']));
+
+      allow delete: if false;
+    }
+
+    // ---- withdrawals ---------------------------------------------------------------------------
+    // Requesting a withdrawal moves the amount out of the balance in the same batch; rejecting it
+    // moves the amount back.
+
+    match /withdrawals/{withdrawalId} {
+      allow get, list: if signedIn() && (resource.data.sellerId == request.auth.uid || managesDoc());
+
+      allow create: if signedIn() && actsForNew()
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'amount', 'method', 'payoutMethod', 'status', 'createdAt'])
+        && request.resource.data.status == 'Pending'
+        && request.resource.data.amount is number && request.resource.data.amount > 0
+        && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId
+        && shopOpen(shopOf(request.resource.data.sellerId))
+        && shopOf(request.resource.data.sellerId).get('withdrawalsBlocked', false) != true
+        && shopOf(request.resource.data.sellerId).balance >= request.resource.data.amount
+        && sameMoney(shopAfter(request.resource.data.sellerId).balance,
+                     shopOf(request.resource.data.sellerId).balance - request.resource.data.amount);
+
+      allow update: if signedIn() && managesDoc()
+        && diffKeys().hasOnly(['status', 'processedAt'])
+        && resource.data.status == 'Pending'
+        && request.resource.data.status in ['Completed', 'Rejected']
+        && (request.resource.data.status == 'Completed'
+            || sameMoney(shopAfter(resource.data.sellerId).balance, shopOf(resource.data.sellerId).balance + resource.data.amount));
+
+      allow delete: if false;
+    }
+
+    // ---- notifications (admin -> seller, and chat notes both ways) --------------------------------
+    // A note is for the seller unless it says `recipient: 'admin'`. Admins write the seller's notes;
+    // a seller only ever writes `chat` notes: one for their admin when they send a support message,
+    // and the welcome note for themself.
+
+    match /notifications/{notificationId} {
+      allow get, list: if signedIn() && (resource.data.sellerId == request.auth.uid || managesDoc());
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'type', 'title', 'message', 'read', 'createdAt', 'recipient'])
+        && request.resource.data.get('read', false) == false
+        && request.resource.data.get('recipient', 'seller') in ['seller', 'admin']
+        && (managesNew()
+            || (request.auth.uid == request.resource.data.sellerId && request.resource.data.type == 'chat'))
+        && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId;
+
+      // Marking a note read: the seller for their own notes, the admin for the ones addressed to them.
+      allow update: if signedIn()
+        && diffKeys().hasOnly(['read'])
+        && ((resource.data.get('recipient', 'seller') == 'admin' && managesDoc())
+            || (resource.data.get('recipient', 'seller') != 'admin' && actsForDoc()));
+
+      allow delete: if false;
+    }
+
+    // ---- payout methods --------------------------------------------------------------------------
+
+    match /payoutMethods/{methodId} {
+      allow get, list: if signedIn() && (resource.data.sellerId == request.auth.uid || managesDoc());
+
+      allow create: if signedIn() && actsForNew()
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'type', 'label', 'bankName', 'holderName', 'accountNumber',
+                                                 'routingNumber', 'network', 'walletAddress', 'isDefault', 'createdAt'])
+        && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId;
+
+      allow update: if false;
+      allow delete: if signedIn() && actsForDoc();
+    }
+
+    // ---- transaction password ---------------------------------------------------------------------
+    // A salted hash of the seller's withdrawal PIN. Readable and writable by that seller only — not by
+    // their admin, not by a super admin — and never listable.
+
+    match /sellerSecurity/{sellerId} {
+      allow get: if signedIn() && request.auth.uid == sellerId;
+      allow list: if false;
+      allow create, update: if signedIn() && request.auth.uid == sellerId
+        && request.resource.data.keys().hasOnly(['sellerId', 'salt', 'hash', 'iterations', 'updatedAt'])
+        && request.resource.data.sellerId == sellerId
+        && request.resource.data.salt is string && request.resource.data.salt.size() <= 64
+        && request.resource.data.hash is string && request.resource.data.hash.size() <= 128
+        && request.resource.data.iterations is number
+        && request.resource.data.updatedAt is string;
+      allow delete: if false;
+    }
+
+    // ---- support chat (one conversation per seller, messages only ever appended) -----------------
+
+    match /supportConversations/{conversationId} {
+      allow get, list: if signedIn() && (resource.data.sellerId == request.auth.uid || managesDoc());
+
+      allow create: if signedIn() && actsForNew()
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'status', 'unreadForAdmin', 'unreadForSeller', 'messages', 'updatedAt'])
+        && request.resource.data.messages.size() == 1
+        && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId;
+
+      allow update: if signedIn() && actsForDoc()
+        && diffKeys().hasOnly(['messages', 'status', 'unreadForAdmin', 'unreadForSeller', 'updatedAt'])
+        && request.resource.data.messages.size() >= resource.data.messages.size()
+        && request.resource.data.messages[0:resource.data.messages.size()] == resource.data.messages;
+
+      allow delete: if false;
+    }
+
+    // ---- admin-only books: ledger, view campaigns ------------------------------------------------
+
+    match /ledger/{entryId} {
+      allow get, list: if signedIn() && managesDoc();
+      allow create: if signedIn() && managesNew()
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'type', 'amount', 'description', 'balance', 'at'])
+        && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId;
+      allow update, delete: if false;
+    }
+
+    match /campaigns/{campaignId} {
+      allow get, list: if signedIn() && managesDoc();
+      allow create: if signedIn() && managesNew()
+        && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId;
+      allow update: if signedIn() && managesDoc() && diffKeys().hasOnly(['status']);
+      allow delete: if false;
+    }
+
+    // ---- seller login history + activity feed ------------------------------------------------------
+
+    match /loginHistory/{entryId} {
+      allow get, list: if signedIn() && managesDoc();
+      allow create: if signedIn() && actsForNew()
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'at', 'ip', 'device'])
+        && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId;
+      allow update, delete: if false;
+    }
+
+    // What the admin's network has been up to. Sellers write their own entries (sign-up, payments,
+    // withdrawals, products); admins write theirs. Append-only.
+    match /activityLogs/{logId} {
+      allow get, list: if signedIn() && managesDoc();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['adminId', 'sellerId', 'actorId', 'type', 'title', 'entity', 'icon', 'at', 'amount'])
+        && (managesNew()
+            || (request.resource.data.get('sellerId', '') == request.auth.uid
+                && shopAfter(request.auth.uid).adminId == request.resource.data.adminId));
+      allow update, delete: if false;
+    }
+
+    // ---- super-admin console audit trail ----------------------------------------------------------
+
+    match /superAdminLogs/{logId} {
+      allow get, list: if isSuperAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['superAdminId', 'actorId', 'actorName', 'type', 'title', 'entity', 'icon', 'at'])
+        && (isSuperAdmin()
+            // An admin registering with a super admin's invite code leaves a note for that super admin.
+            || (isAdmin()
+                && request.resource.data.type == 'admin_registered'
+                && request.resource.data.actorId == request.auth.uid
+                && request.resource.data.superAdminId == me().get('superAdminId', '')));
+      allow update, delete: if false;
+    }
+
+    match /adminLoginHistory/{entryId} {
+      allow get, list: if isSuperAdmin() || (isAdmin() && resource.data.adminId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['adminId', 'at', 'via'])
+        && (isSuperAdmin() || (isAdmin() && request.resource.data.adminId == request.auth.uid));
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,23 +1,64 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
+const KycApprovedModal = ({ onContinue }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4">
+    <div className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-2xl">
+      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+        <svg className="h-9 w-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <h2 className="text-2xl font-black text-gray-900">KYC Approved</h2>
+      <p className="mt-2 text-gray-500">
+        Your identity verification has been approved. You now have full access to all seller features, including withdrawals.
+      </p>
+      <button
+        onClick={onContinue}
+        className="mt-6 w-full rounded-2xl bg-emerald-600 px-5 py-3.5 font-black text-white hover:bg-emerald-700 transition-colors"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+)
+
 const SellerDashboard = () => {
-  const { seller } = useAuth()
+  const { seller, getSellerActivityStats, getSellerOrders, getSellerSlotInfo, getSellerShopProductsFull, acknowledgeKyc } = useAuth()
+  const [ackDismissed, setAckDismissed] = useState(false)
+
+  const activity = getSellerActivityStats(seller.id)
+  const sellerOrders = getSellerOrders(seller.id)
+  const slots = getSellerSlotInfo(seller.id)
+  const shopProducts = getSellerShopProductsFull(seller.id)
+  const showKycModal = seller.verified && !seller.kycAckSeen && !ackDismissed
+
+  const categoryBreakdown = Object.entries(
+    shopProducts.reduce((acc, product) => {
+      const category = product.category || 'Uncategorized'
+      acc[category] = (acc[category] || 0) + 1
+      return acc
+    }, {})
+  )
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => b.count - a.count)
+  const maxCategoryCount = categoryBreakdown[0]?.count || 1
 
   const stats = {
-    totalRevenue: 0.0,
-    totalProfit: 0.0,
-    totalOrders: 0,
-    totalViews: 0,
-    todayViews: 0,
-    pending: 0,
-    delivered: 0,
-    products: 0,
-    thisMonthProfit: 0.0,
-    margin: 0,
-    totalCost: 0.0,
-    thisMonthRevenue: 0.0,
-    avgOrderValue: 0.0,
+    totalRevenue: activity.revenue,
+    totalProfit: activity.profit,
+    totalOrders: activity.ordersTotal,
+    totalViews: activity.totalViews,
+    todayViews: activity.todaysViews,
+    pending: sellerOrders.filter((order) => !['Delivered', 'Cancelled'].includes(order.status)).length,
+    delivered: sellerOrders.filter((order) => order.status === 'Delivered').length,
+    products: slots.used,
+    thisMonthProfit: activity.profit,
+    margin: activity.revenue ? Math.round((activity.profit / activity.revenue) * 100) : 0,
+    totalCost: activity.revenue - activity.profit,
+    thisMonthRevenue: activity.revenue,
+    avgOrderValue: activity.ordersTotal ? activity.revenue / activity.ordersTotal : 0,
   }
 
   const bigStatCards = [
@@ -244,30 +285,58 @@ const SellerDashboard = () => {
             <h2 className="text-xl font-bold text-gray-900">Products by Category</h2>
           </div>
 
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-5">
-              <svg className="w-9 h-9 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
+          {categoryBreakdown.length ? (
+            <div className="space-y-4">
+              {categoryBreakdown.map((row) => (
+                <div key={row.category}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-semibold text-gray-700 truncate">{row.category}</span>
+                    <span className="text-sm font-bold text-gray-900 shrink-0 ml-2">{row.count}</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#0a3d62]"
+                      style={{ width: `${Math.max(6, Math.round((row.count / maxCategoryCount) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-            <p className="text-base font-semibold text-gray-900 mb-1.5">
-              No products yet
-            </p>
-            <p className="text-sm text-gray-500 leading-relaxed max-w-[260px]">
-              Add your first product to see category breakdown.
-            </p>
-            <Link
-              to="/seller/products"
-              className="mt-6 inline-flex items-center space-x-2 px-5 py-2.5 bg-[#0a3d62] hover:bg-[#0f4c81] text-white font-semibold rounded-xl transition-colors shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add product</span>
-            </Link>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-5">
+                <svg className="w-9 h-9 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <p className="text-base font-semibold text-gray-900 mb-1.5">
+                No products yet
+              </p>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-[260px]">
+                Add your first product to see category breakdown.
+              </p>
+              <Link
+                to="/seller/products"
+                className="mt-6 inline-flex items-center space-x-2 px-5 py-2.5 bg-[#0a3d62] hover:bg-[#0f4c81] text-white font-semibold rounded-xl transition-colors shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Add product</span>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
+
+      {showKycModal && (
+        <KycApprovedModal
+          onContinue={() => {
+            setAckDismissed(true)
+            acknowledgeKyc()
+          }}
+        />
+      )}
     </div>
   )
 }

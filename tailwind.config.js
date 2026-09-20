@@ -14,6 +14,14 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
+      keyframes: {
+        'sheet-up': { from: { transform: 'translateY(2rem)', opacity: '0' }, to: { transform: 'translateY(0)', opacity: '1' } },
+        'toast-in': { from: { transform: 'translateY(-0.5rem)', opacity: '0' }, to: { transform: 'translateY(0)', opacity: '1' } },
+      },
+      animation: {
+        'sheet-up': 'sheet-up 0.2s ease-out',
+        'toast-in': 'toast-in 0.2s ease-out',
+      },
     },
   },
   plugins: [],

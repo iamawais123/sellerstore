@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const CustomerSignup = () => {
   const navigate = useNavigate()
-  const { loginCustomer } = useAuth()
+  const { signUpCustomer } = useAuth()
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -13,6 +13,8 @@ const CustomerSignup = () => {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const features = [
     {
@@ -47,10 +49,18 @@ const CustomerSignup = () => {
     },
   ]
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    loginCustomer({ fullName: form.fullName, email: form.email })
-    navigate('/')
+    setError('')
+    if (!form.fullName.trim()) return setError('Please enter your full name.')
+    if (!form.email.trim()) return setError('Please enter your email address.')
+    if (form.password.length < 6) return setError('Password must be at least 6 characters.')
+    if (form.password !== form.confirmPassword) return setError('Passwords do not match.')
+    setSubmitting(true)
+    const result = await signUpCustomer({ fullName: form.fullName, email: form.email, password: form.password })
+    setSubmitting(false)
+    if (result.success) navigate('/')
+    else setError(result.error)
   }
 
   return (
@@ -134,6 +144,12 @@ const CustomerSignup = () => {
             <p className="text-gray-500 mb-8 text-lg">
               Get started in less than a minute.
             </p>
+
+            {error && (
+              <div role="alert" className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-sm font-medium text-rose-700">
+                {error}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
@@ -250,9 +266,10 @@ const CustomerSignup = () => {
 
               <button
                 type="submit"
-                className="w-full mt-2 py-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-2xl shadow-lg shadow-slate-900/20 transition-all duration-200 hover:shadow-xl hover:shadow-slate-900/30 text-lg"
+                disabled={submitting}
+                className="w-full mt-2 py-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-2xl shadow-lg shadow-slate-900/20 transition-all duration-200 hover:shadow-xl hover:shadow-slate-900/30 text-lg disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Create Account
+                {submitting ? 'Creating account…' : 'Create Account'}
               </button>
             </form>
 
