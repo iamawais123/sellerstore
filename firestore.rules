@@ -375,13 +375,18 @@ service cloud.firestore {
 
     // ---- withdrawals ---------------------------------------------------------------------------
     // Requesting a withdrawal moves the amount out of the balance in the same batch; rejecting it
-    // moves the amount back.
+    // moves the amount back. An admin may also file one for a seller (`initiatedBy: 'admin'`, with an
+    // optional `note`), and records the payout `reference` and the `sellerMessage` when deciding.
 
     match /withdrawals/{withdrawalId} {
       allow get, list: if signedIn() && (resource.data.sellerId == request.auth.uid || managesDoc());
 
       allow create: if signedIn() && actsForNew()
-        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'amount', 'method', 'payoutMethod', 'status', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['sellerId', 'adminId', 'amount', 'method', 'payoutMethod', 'status', 'createdAt',
+                                                 'initiatedBy', 'note'])
+        && (request.resource.data.get('initiatedBy', 'seller') == 'seller'
+            || (request.resource.data.initiatedBy == 'admin' && managesNew()))
+        && textWithin(request.resource.data, 'note', 240)
         && request.resource.data.status == 'Pending'
         && request.resource.data.amount is number && request.resource.data.amount > 0
         && shopOf(request.resource.data.sellerId).adminId == request.resource.data.adminId
@@ -392,7 +397,9 @@ service cloud.firestore {
                      shopOf(request.resource.data.sellerId).balance - request.resource.data.amount);
 
       allow update: if signedIn() && managesDoc()
-        && diffKeys().hasOnly(['status', 'processedAt'])
+        && diffKeys().hasOnly(['status', 'processedAt', 'reference', 'sellerMessage'])
+        && textWithin(request.resource.data, 'reference', 200)
+        && textWithin(request.resource.data, 'sellerMessage', 1000)
         && resource.data.status == 'Pending'
         && request.resource.data.status in ['Completed', 'Rejected']
         && (request.resource.data.status == 'Completed'

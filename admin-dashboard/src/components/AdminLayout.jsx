@@ -21,7 +21,8 @@ const AdminLayout = () => {
   const [editingInvite, setEditingInvite] = useState(false)
   const [inviteDraft, setInviteDraft] = useState(admin.inviteCode || '')
   const [copied, setCopied] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // The mobile drawer only. On desktop (lg+) the sidebar is always shown and the content always makes room for it.
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [inviteError, setInviteError] = useState('')
 
   // What sellers wrote in support chat: unread messages badge the Support link, and each message
@@ -29,6 +30,11 @@ const AdminLayout = () => {
   const supportUnread = getSupportConversations('admin').reduce((sum, item) => sum + (item.unreadForAdmin || 0), 0)
   const notifications = getAdminNotifications()
   const unreadNotifications = notifications.filter((item) => !item.read)
+
+  // Picking a page on a phone should reveal it, not leave the drawer covering it.
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     if (!bellOpen) return undefined
@@ -136,6 +142,10 @@ const AdminLayout = () => {
       ),
     },
   ]
+
+  // The top bar names the page you are on, using the same label and icon as its sidebar link.
+  const currentPage =
+    [...manageItems, ...communicationItems, ...financeItems, ...activityItems].find((item) => item.to === location.pathname) || manageItems[0]
 
   const handleCopyInvite = async () => {
     try {
@@ -369,7 +379,7 @@ const AdminLayout = () => {
         </div>
       </aside>
 
-      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-[280px]' : 'ml-0'}`}>
+      <main className="flex-1 min-w-0 lg:ml-[280px]">
         <div className="sticky top-0 z-20">
         {impersonation && (
           <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-violet-600 to-indigo-600 px-5 lg:px-8 py-3 text-white">
@@ -398,10 +408,8 @@ const AdminLayout = () => {
                 </svg>
               </button>
               <div className="flex items-center space-x-2">
-                <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                </svg>
-                <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Dashboard</h1>
+                <span className="text-gray-500">{currentPage.icon}</span>
+                <h1 className="text-xl lg:text-2xl font-bold text-gray-900">{currentPage.label}</h1>
               </div>
             </div>
             <div className="flex items-center space-x-2">

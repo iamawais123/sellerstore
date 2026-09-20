@@ -193,6 +193,7 @@ export function AuthProvider({ children }) {
   const [shops, setShops] = useState(EMPTY)
   const [orders, setOrders] = useState(EMPTY)
   const [withdrawals, setWithdrawals] = useState(EMPTY)
+  const [payoutMethods, setPayoutMethods] = useState(EMPTY)
   const [notifications, setNotifications] = useState(EMPTY)
   const [ledger, setLedger] = useState(EMPTY)
   const [campaigns, setCampaigns] = useState(EMPTY)
@@ -203,7 +204,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const clear = () => {
-      ;[setShops, setOrders, setWithdrawals, setNotifications, setLedger, setCampaigns, setLoginHistory, setConversations, setAdminLogs].forEach((set) => set(EMPTY))
+      ;[setShops, setOrders, setWithdrawals, setPayoutMethods, setNotifications, setLedger, setCampaigns, setLoginHistory, setConversations, setAdminLogs].forEach((set) => set(EMPTY))
     }
     if (!admin.id || !identityReady) {
       clear()
@@ -221,6 +222,7 @@ export function AuthProvider({ children }) {
       shopData.watchList(db, shopData.COL.shops, mine, setShops, onError, shopData.mapShop),
       shopData.watchList(db, shopData.COL.orders, mine, (rows) => setOrders(rows.filter((order) => Array.isArray(order.items))), onError),
       shopData.watchList(db, shopData.COL.withdrawals, mine, setWithdrawals, onError),
+      shopData.watchList(db, shopData.COL.payoutMethods, mine, setPayoutMethods, onError),
       shopData.watchList(db, shopData.COL.notifications, mine, setNotifications, onError, shopData.mapNotification),
       shopData.watchList(db, shopData.COL.ledger, mine, setLedger, onError, shopData.mapTimed),
       shopData.watchList(db, shopData.COL.campaigns, mine, setCampaigns, onError),
@@ -235,6 +237,7 @@ export function AuthProvider({ children }) {
   const sellersRegistry = shops
   const ordersBySeller = useMemo(() => groupBy(shopData.sortNewest(orders), 'sellerId'), [orders])
   const withdrawalsBySeller = useMemo(() => groupBy(shopData.sortNewest(withdrawals), 'sellerId'), [withdrawals])
+  const payoutMethodsBySeller = useMemo(() => groupBy(shopData.sortNewest(payoutMethods), 'sellerId'), [payoutMethods])
   // One collection holds both directions: notes the admin sent to a seller, and the chat notes
   // sellers raised for the admin (`recipient: 'admin'`).
   const sortedNotifications = useMemo(() => shopData.sortNewest(notifications), [notifications])
@@ -473,8 +476,18 @@ export function AuthProvider({ children }) {
     )
   }
 
-  const processWithdrawal = (sellerId, withdrawalId, approve) =>
-    withShop(sellerId, (db, target, actorId) => shopData.processWithdrawal(db, target, withdrawalId, approve, actorId))
+  // `details` is `{ reference, message }`: the transaction id the payout was made with, and the note the seller is sent.
+  const processWithdrawal = (sellerId, withdrawalId, approve, details) =>
+    withShop(sellerId, (db, target, actorId) => shopData.processWithdrawal(db, target, withdrawalId, approve, actorId, details))
+
+  // The payout methods a seller has saved (bank accounts / wallets), newest first.
+  const getSellerPayoutMethods = (sellerId) => payoutMethodsBySeller[sellerId] || EMPTY
+
+  // "New withdrawal": the admin files a pending request for a seller. `{ amount, method, note, notify }`.
+  const initiateWithdrawal = (sellerId, { amount, method, note, notify }) =>
+    withShop(sellerId, (db, target, actorId) =>
+      shopData.requestWithdrawal(db, target.id, amount, method, actorId, { onBehalf: true, note, notify })
+    )
 
   // ---- shop catalog (the master catalog products a seller has added to their shop) ----------------------------
 
@@ -598,6 +611,8 @@ export function AuthProvider({ children }) {
         getSellerCampaigns,
         getAllWithdrawalsForAdmin,
         processWithdrawal,
+        initiateWithdrawal,
+        getSellerPayoutMethods,
         getAllSellerOrders,
         suspendSellerAccount,
         toggleSellerWithdrawals,

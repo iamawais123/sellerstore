@@ -451,7 +451,10 @@ export const payOrder = (db, sellerId, orderId, actorId = sellerId) =>
 
 // The seller asks to withdraw part of their balance: the amount leaves the balance immediately and
 // waits as a pending request (it is returned if the admin rejects it).
-export const requestWithdrawal = (db, sellerId, amount, method, actorId = sellerId) =>
+//
+// `onBehalf` is the admin console filing the request for a seller ("New withdrawal"): the request is
+// marked `initiatedBy: 'admin'`, may carry the admin's `note`, and `notify` tells the seller about it.
+export const requestWithdrawal = (db, sellerId, amount, method, actorId = sellerId, { onBehalf = false, note = '', notify = false } = {}) =>
   attempt(() =>
     runTransaction(db, async (tx) => {
       const value = round2(amount)
@@ -459,9 +462,9 @@ export const requestWithdrawal = (db, sellerId, amount, method, actorId = seller
       const shopSnap = await tx.get(shopRef)
       if (!shopSnap.exists()) refuse('Seller not found')
       const shop = shopSnap.data()
-      if (shop.deleted || shop.suspended) refuse('Your account is not active. Contact support for help.')
-      if (shop.withdrawalsBlocked) refuse('Withdrawals are currently blocked by admin for your store')
-      if (!Number.isFinite(value) || value <= 0 || value > (shop.balance || 0)) refuse('Enter an amount within your available balance')
+      if (shop.deleted || shop.suspended) refuse(onBehalf ? 'This seller\'s account is not active.' : 'Your account is not active. Contact support for help.')
+      if (shop.withdrawalsBlocked) refuse(onBehalf ? 'Withdrawals are blocked for this seller. Allow them from the Sellers page first.' : 'Withdrawals are currently blocked by admin for your store')
+      if (!Number.isFinite(value) || value <= 0 || value > (shop.balance || 0)) refuse(onBehalf ? 'Enter an amount within the seller\'s available balance' : 'Enter an amount within your available balance')
       const request = clean({
         sellerId,
         adminId: shop.adminId,
@@ -470,11 +473,29 @@ export const requestWithdrawal = (db, sellerId, amount, method, actorId = seller
         payoutMethod: method && typeof method === 'object' ? method : null,
         status: 'Pending',
         createdAt: nowIso(),
+        initiatedBy: onBehalf ? 'admin' : undefined,
+        note: onBehalf ? text(note, 240) || undefined : undefined,
       })
       const requestRef = doc(collection(db, COL.withdrawals))
       tx.set(requestRef, request)
       tx.update(shopRef, { balance: round2((shop.balance || 0) - value) })
-      stageActivity(db, tx, { adminId: shop.adminId, sellerId, actorId, type: 'withdrawal_requested', title: 'Seller requested withdrawal', entity: shop.fullName, icon: 'wallet', amount: value })
+      stageActivity(db, tx, {
+        adminId: shop.adminId,
+        sellerId,
+        actorId,
+        type: onBehalf ? 'withdrawal_initiated' : 'withdrawal_requested',
+        title: onBehalf ? 'Admin filed a withdrawal for seller' : 'Seller requested withdrawal',
+        entity: shop.fullName,
+        icon: 'wallet',
+        amount: value,
+      })
+      if (onBehalf && notify) {
+        stageNotification(db, tx, { id: sellerId, adminId: shop.adminId }, {
+          type: 'withdrawal',
+          title: 'Withdrawal requested',
+          message: `A withdrawal of ${money(value)} was filed for you by your admin. ${money(value)} was moved out of your shop balance and the request is now pending review.`,
+        })
+      }
       return { success: true, request: { id: requestRef.id, ...request } }
     })
   )
@@ -956,7 +977,9 @@ export const setOrderStatus = (db, target, orderId, status, actorId) =>
 
 // ---- admin: withdrawals -----------------------------------------------------------------------------
 
-export const processWithdrawal = (db, target, withdrawalId, approve, actorId) =>
+// `reference` is the bank / blockchain transaction id the admin paid with (internal audit trail and shown
+// to the seller); `message` replaces the default note the seller is sent about the decision.
+export const processWithdrawal = (db, target, withdrawalId, approve, actorId, { reference = '', message = '' } = {}) =>
   attempt(() =>
     runTransaction(db, async (tx) => {
       const shopRef = doc(db, COL.shops, target.id)
@@ -968,7 +991,9 @@ export const processWithdrawal = (db, target, withdrawalId, approve, actorId) =>
       const request = requestSnap.data()
       if (request.status !== 'Pending') refuse('This request has already been processed')
       const nextStatus = approve ? 'Completed' : 'Rejected'
-      tx.update(requestRef, { status: nextStatus, processedAt: nowIso() })
+      const ref = approve ? text(reference, 200) : ''
+      const note = text(message, 1000)
+      tx.update(requestRef, clean({ status: nextStatus, processedAt: nowIso(), reference: ref || undefined, sellerMessage: note || undefined }))
       if (!approve) tx.update(shopRef, { balance: round2((shop.balance || 0) + request.amount) })
       stageActivity(db, tx, {
         adminId: target.adminId,
@@ -983,9 +1008,9 @@ export const processWithdrawal = (db, target, withdrawalId, approve, actorId) =>
       stageNotification(db, tx, target, {
         type: 'withdrawal',
         title: approve ? 'Withdrawal approved' : 'Withdrawal rejected',
-        message: approve
+        message: note || (approve
           ? `Your withdrawal of ${money(request.amount)} has been approved and sent to your payout method.`
-          : `Your withdrawal request of ${money(request.amount)} was rejected and the amount has been returned to your shop balance.`,
+          : `Your withdrawal request of ${money(request.amount)} was rejected and the amount has been returned to your shop balance.`),
       })
       return { success: true }
     })

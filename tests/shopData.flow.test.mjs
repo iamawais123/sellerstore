@@ -336,6 +336,50 @@ describe('withdrawals', () => {
     await shop.setSuspended(db('a1'), target, true, 'a1')
     assert.equal((await shop.requestWithdrawal(db('s1'), 's1', 10, { label: 'x' })).success, false)
   })
+
+  it('records the payout reference and the message the admin sends the seller', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    const request = await shop.requestWithdrawal(db('s1'), 's1', 40, { label: 'Bank', type: 'bank' })
+    const done = await shop.processWithdrawal(db('a1'), target, request.request.id, true, 'a1', { reference: '0x9f12', message: 'Paid, check your bank.' })
+    assert.equal(done.success, true)
+    const saved = await read(db('s1'), `withdrawals/${request.request.id}`)
+    assert.equal(saved.status, 'Completed')
+    assert.equal(saved.reference, '0x9f12')
+    assert.equal(saved.sellerMessage, 'Paid, check your bank.')
+    const notes = await getDocs(query(collection(db('s1'), 'notifications'), where('sellerId', '==', 's1')))
+    assert.ok(notes.docs.some((d) => d.data().title === 'Withdrawal approved' && d.data().message === 'Paid, check your bank.'))
+  })
+
+  it('lets an admin file a withdrawal for a seller: pending, balance moved, seller told', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    const method = { type: 'bank', label: 'Chase', bankName: 'Chase', holderName: 'S One', accountNumber: '123456' }
+    const filed = await shop.requestWithdrawal(db('a1'), 's1', 35, method, 'a1', { onBehalf: true, note: 'Asked on WhatsApp', notify: true })
+    assert.equal(filed.success, true)
+    assert.equal((await read(db('s1'), 'shops/s1')).balance, 65)
+    const saved = await read(db('a1'), `withdrawals/${filed.request.id}`)
+    assert.equal(saved.status, 'Pending')
+    assert.equal(saved.initiatedBy, 'admin')
+    assert.equal(saved.note, 'Asked on WhatsApp')
+    assert.equal(saved.payoutMethod.accountNumber, '123456')
+    const notes = await getDocs(query(collection(db('s1'), 'notifications'), where('sellerId', '==', 's1')))
+    assert.ok(notes.docs.some((d) => d.data().title === 'Withdrawal requested'))
+
+    // without "notify seller" nothing is sent, and the admin can still decide it afterwards
+    const quiet = await shop.requestWithdrawal(db('a1'), 's1', 5, method, 'a1', { onBehalf: true })
+    assert.equal(quiet.success, true)
+    const after = await getDocs(query(collection(db('s1'), 'notifications'), where('sellerId', '==', 's1')))
+    assert.equal(after.size, notes.size)
+    assert.equal((await shop.processWithdrawal(db('a1'), target, quiet.request.id, false, 'a1')).success, true)
+    assert.equal((await read(db('s1'), 'shops/s1')).balance, 65)
+  })
+
+  it('will not let a seller pose as the admin, nor another admin file for their seller', async () => {
+    await verifiedShop({ balance: 100 })
+    const forged = shop.requestWithdrawal(db('s1'), 's1', 10, { label: 'x' }, 's1', { onBehalf: true })
+    assert.equal((await forged).success, false)
+    assert.equal((await shop.requestWithdrawal(db('a2'), 's1', 10, { label: 'x' }, 'a2', { onBehalf: true })).success, false)
+    assert.equal((await read(db('s1'), 'shops/s1')).balance, 100)
+  })
 })
 
 describe('catalogue', () => {

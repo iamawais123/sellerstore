@@ -68,7 +68,7 @@ const SellerNotifications = () => {
                 className={`w-full rounded-2xl border p-4 text-left transition-colors ${notification.read ? 'border-gray-100 bg-gray-50' : 'border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50'}`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div><h3 className="font-bold text-gray-900">{notification.title}</h3><p className="mt-1 text-sm text-gray-600">{notification.message}</p></div>
+                  <div><h3 className="font-bold text-gray-900">{notification.title}</h3><p className="mt-1 whitespace-pre-line text-sm text-gray-600">{notification.message}</p></div>
                   {!notification.read && <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-1 text-xs font-bold text-indigo-700">New</span>}
                 </div>
                 <p className="mt-2 text-xs font-semibold text-gray-400">{notification.time}</p>

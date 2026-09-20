@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { PasswordField } from '../../components/profile/Sheet'
 
+// The console calls a paid-out request "Approved"; the database keeps `Completed`.
+const REQUEST_STATUS = {
+  Pending: { label: 'Pending review', pill: 'bg-amber-100 text-amber-700' },
+  Completed: { label: 'Approved', pill: 'bg-emerald-100 text-emerald-700' },
+  Rejected: { label: 'Rejected', pill: 'bg-rose-100 text-rose-700' },
+}
+
 const WithdrawFunds = () => {
   const navigate = useNavigate()
   const { seller, getSellerWithdrawals, requestSellerWithdrawal, getSellerPayoutMethods, hasTransactionPassword, verifyTransactionPassword } = useAuth()
@@ -258,11 +265,26 @@ const WithdrawFunds = () => {
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {recentRequests.map((r) => (
-                <div key={r.id} className="p-5 lg:p-6">
-                  <p className="font-semibold">${r.amount.toFixed(2)}</p>
-                </div>
-              ))}
+              {recentRequests.slice(0, 20).map((r) => {
+                const st = REQUEST_STATUS[r.status] || { label: r.status, pill: 'bg-gray-100 text-gray-600' }
+                return (
+                  <div key={r.id} className="p-5 lg:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <p className="text-lg font-bold text-gray-900">${Number(r.amount || 0).toFixed(2)}</p>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${st.pill}`}>{st.label}</span>
+                      </div>
+                      <p className="text-xs font-semibold text-gray-400">{new Date(r.createdAt).toLocaleString()}</p>
+                    </div>
+                    {r.method && <p className="mt-1 text-sm text-gray-500">To {r.method}</p>}
+                    {r.status === 'Rejected' && <p className="mt-1 text-sm text-gray-500">The amount was returned to your balance.</p>}
+                    {r.reference && <p className="mt-1 break-all text-sm text-gray-500">Reference: <span className="font-mono font-semibold text-gray-700">{r.reference}</span></p>}
+                    {r.sellerMessage && (
+                      <p className="mt-3 whitespace-pre-line rounded-2xl bg-gray-50 p-3.5 text-sm text-gray-700">{r.sellerMessage}</p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
