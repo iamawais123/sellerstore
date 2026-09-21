@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { isOnline } from '../../lib/supportChat'
 
 const avatarColors = [
   'from-violet-500 to-purple-600',
@@ -69,6 +71,8 @@ const Icon = ({ name, className = 'w-5 h-5' }) => {
       return <svg {...common}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
     case 'send':
       return <svg {...common}><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+    case 'calendar':
+      return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
     case 'clock':
       return <svg {...common}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
     case 'check':
@@ -605,6 +609,7 @@ const LoginHistoryModal = ({ seller, onClose }) => {
     if (!q) return true
     return (
       (h.ip && h.ip.toLowerCase().includes(q)) ||
+      (h.location && h.location.toLowerCase().includes(q)) ||
       (h.city && h.city.toLowerCase().includes(q)) ||
       (h.region && h.region.toLowerCase().includes(q)) ||
       (h.country && h.country.toLowerCase().includes(q)) ||
@@ -646,7 +651,7 @@ const LoginHistoryModal = ({ seller, onClose }) => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by IP, city, country, browser, device."
+              placeholder="Search by IP, place or device..."
               className="w-full pl-14 pr-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-3xl text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all"
             />
           </div>
@@ -671,7 +676,7 @@ const LoginHistoryModal = ({ seller, onClose }) => {
                   <div className="flex items-start gap-2 mb-2">
                     <Icon name="info" className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-black text-lg text-gray-900">{h.city}{h.region ? `, ${h.region}` : ''}{h.country ? `, ${h.country}` : ''}</span>
+                      <span className="font-black text-lg text-gray-900">{h.ip === 'Admin impersonation' ? 'Admin signed in as this seller' : h.location || [h.city, h.region, h.country].filter(Boolean).join(', ') || 'Location unknown'}</span>
                       {h.countryCode && <span className="ml-2 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">{h.countryCode}</span>}
                     </div>
                   </div>
@@ -679,7 +684,7 @@ const LoginHistoryModal = ({ seller, onClose }) => {
                     <Icon name="laptop" className="w-4 h-4 text-gray-400" />
                     <span>{h.deviceType}{h.os ? ` • ${h.os}` : ''}{h.browser ? ` • ${h.browser}` : ''}</span>
                   </div>
-                  {h.ip && (
+                  {h.ip && h.ip !== 'Admin impersonation' && (
                     <div className="flex items-center gap-2 mb-2">
                       <Icon name="globe" className="w-4 h-4 text-gray-400" />
                       <span className="font-mono font-bold text-gray-800">{h.ip}</span>
@@ -883,7 +888,7 @@ const GuaranteeModal = ({ seller, onClose }) => {
 
 const RatingModal = ({ seller, onClose }) => {
   const { adjustSellerRating } = useAuth()
-  const [rating, setRating] = useState((seller.rating || 5).toFixed(2))
+  const [rating, setRating] = useState(Number(seller.rating ?? 5).toFixed(2))
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -1662,9 +1667,37 @@ const DeleteStoreModal = ({ seller, onClose }) => {
   )
 }
 
+// Re-renders every `ms`, so "Online" turns into "Active 5m ago" without any data arriving.
+const useNow = (ms) => {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), ms)
+    return () => clearInterval(timer)
+  }, [ms])
+  return now
+}
+
+// The seller's account tier as one word and a colour: what needs the admin's attention first.
+const tierOf = (seller) => {
+  if (seller.deleted) return ['DELETED', 'bg-rose-50 text-rose-700 ring-rose-200']
+  if (seller.suspended) return ['SUSPENDED', 'bg-amber-50 text-amber-700 ring-amber-200']
+  if (seller.verified) return ['VERIFIED', 'bg-emerald-50 text-emerald-700 ring-emerald-200']
+  const kyc = seller.kyc?.status
+  return kyc === 'Rejected' ? ['REJECTED', 'bg-rose-50 text-rose-700 ring-rose-200'] : ['UNVERIFIED', 'bg-slate-100 text-slate-600 ring-slate-200']
+}
+
+const joinedOn = (seller) => {
+  const date = new Date(seller.createdAt || '')
+  return Number.isNaN(date.getTime()) ? seller.memberSince || '' : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+const money2 = (value) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
 const AdminSellers = () => {
   const { sellersRegistry, admin, impersonateSellerLogin } = useAuth()
-  const [search, setSearch] = useState('')
+  // `?q=` opens the directory already narrowed to one seller (e.g. "Open full profile" in support chat).
+  const [params] = useSearchParams()
+  const [search, setSearch] = useState(params.get('q') || '')
   const [showDeleted, setShowDeleted] = useState(false)
   const [openMenuFor, setOpenMenuFor] = useState(null)
   const [passwordModal, setPasswordModal] = useState(null)
@@ -1680,40 +1713,46 @@ const AdminSellers = () => {
   const [blockWdModal, setBlockWdModal] = useState(null)
   const [allowRemoveModal, setAllowRemoveModal] = useState(null)
   const [deleteModal, setDeleteModal] = useState(null)
+  const [loginError, setLoginError] = useState('')
+  const [loggingInAs, setLoggingInAs] = useState(null)
+  const now = useNow(30 * 1000)
 
   const menuRef = useRef(null)
   useEffect(() => {
+    if (!openMenuFor) return undefined
     const onDoc = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) setOpenMenuFor(null)
     }
+    const onKey = (e) => e.key === 'Escape' && setOpenMenuFor(null)
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [])
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [openMenuFor])
 
   const mySellers = sellersRegistry.filter((s) => s.adminId === admin.id)
   const displaySellers = mySellers.filter((s) => (showDeleted ? s.deleted : !s.deleted))
+  const deletedCount = mySellers.filter((s) => s.deleted).length
 
-  const filtered = displaySellers.filter((s) => {
-    const q = search.toLowerCase().trim()
-    if (!q) return true
-    return (
-      (s.fullName && s.fullName.toLowerCase().includes(q)) ||
-      (s.shopName && s.shopName.toLowerCase().includes(q)) ||
-      (s.email && s.email.toLowerCase().includes(q))
-    )
-  })
-
-  const [loginError, setLoginError] = useState('')
+  const q = search.toLowerCase().trim()
+  const filtered = displaySellers.filter(
+    (s) => !q || [s.fullName, s.shopName, s.email].some((field) => field && field.toLowerCase().includes(q))
+  )
 
   const handleLoginAs = async (seller) => {
     setLoginError('')
+    setLoggingInAs(seller.id)
     const r = await impersonateSellerLogin(seller.id)
-    if (!r.success) setLoginError(r.error || 'Could not open the seller portal.')
-    if (r.success) {
-      // The seller area belongs to the storefront app, so this needs a real page load: navigate()
-      // would resolve inside this app's own /admin-app router and land on its catch-all route.
-      window.location.assign('/seller/dashboard')
+    if (!r.success) {
+      setLoggingInAs(null)
+      setLoginError(r.error || 'Could not open the seller portal.')
+      return
     }
+    // The seller area belongs to the storefront app, so this needs a real page load: navigate()
+    // would resolve inside this app's own /admin-app router and land on its catch-all route.
+    window.location.assign('/seller/dashboard')
   }
 
   const handleMenuAction = (item) => {
@@ -1734,130 +1773,161 @@ const AdminSellers = () => {
   }
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-slate-50/50 to-white">
-      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-gray-100">
-        <div className="flex items-center gap-3 px-5 py-4">
-          <button className="p-2 rounded-xl hover:bg-gray-100 text-gray-600">
-            <Icon name="menu" className="w-6 h-6" />
-          </button>
-          <div className="flex items-center gap-2.5">
-            <Icon name="users" className="w-7 h-7 text-gray-800" />
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Sellers Directory</h1>
-          </div>
+    <div className="mx-auto max-w-[1400px] space-y-5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-l-4 border-indigo-600 pl-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+          <Icon name="users" className="h-6 w-6" />
+        </span>
+        <div className="min-w-0 flex-1 basis-72">
+          <h1 className="text-2xl font-black leading-tight text-gray-900">Sellers</h1>
+          <p className="text-sm text-gray-500">All sellers who registered with your invitation code. Click a row to manage.</p>
         </div>
-        {loginError && <p className="mx-5 mb-3 rounded-2xl bg-rose-50 p-3 text-center font-bold text-rose-700">{loginError}</p>}
-
-        <div className="px-5 pb-5 space-y-3">
-          <div className="relative">
-            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
-              <Icon name="search" className="w-6 h-6" />
-            </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-72">
+            <Icon name="search" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search shop, name, or email..."
-              className="w-full pl-14 pr-5 py-4.5 h-[60px] bg-slate-50 border-2 border-slate-100 rounded-3xl text-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all"
-              style={{ height: '60px' }}
+              aria-label="Search sellers"
+              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10"
             />
           </div>
-
-          <div className="flex items-center justify-between px-3 py-4 bg-slate-50 border-2 border-slate-100 rounded-3xl">
-            <div className="flex-1 text-center">
-              <span className="text-lg font-bold text-gray-700">Deleted</span>
-            </div>
+          <span className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wider text-gray-500" aria-live="polite">
+            Results
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-sm normal-case tracking-normal text-gray-900">{filtered.length}</span>
+          </span>
+          <label className="inline-flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-bold text-gray-700">
+            Deleted{deletedCount > 0 && <span className="text-xs font-semibold text-gray-400">({deletedCount})</span>}
             <button
+              type="button"
+              role="switch"
+              aria-checked={showDeleted}
+              aria-label="Show deleted sellers"
               onClick={() => setShowDeleted((v) => !v)}
-              className={`relative w-16 h-9 rounded-full transition-all ${showDeleted ? 'bg-indigo-500' : 'bg-gray-300'}`}
-              aria-pressed={showDeleted}
+              className={`relative h-6 w-11 rounded-full transition-colors ${showDeleted ? 'bg-indigo-600' : 'bg-gray-300'}`}
             >
-              <span className={`absolute top-1 left-1 w-7 h-7 bg-white rounded-full shadow transition-transform ${showDeleted ? 'translate-x-7' : 'translate-x-0'}`} />
+              <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${showDeleted ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
-            <div className="w-16" />
-          </div>
+          </label>
         </div>
       </div>
 
-      <div className="px-5 py-6 space-y-4 max-w-4xl mx-auto">
-        {filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-gray-100 flex items-center justify-center mb-4">
-              <Icon name="users" className="w-10 h-10 text-gray-400" />
-            </div>
-            <p className="text-xl font-bold text-gray-800">No sellers found</p>
-            <p className="text-gray-500 mt-2">{search ? 'Try a different search term' : showDeleted ? 'No deleted sellers' : 'Share your invite code to onboard sellers'}</p>
+      {loginError && (
+        <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+          {loginError}
+        </p>
+      )}
+
+      {filtered.length === 0 ? (
+        <div className="rounded-3xl border border-gray-100 bg-white py-20 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
+            <Icon name="users" className="h-8 w-8 text-gray-400" />
           </div>
-        ) : (
-          filtered.map((s) => {
+          <p className="text-xl font-bold text-gray-800">No sellers found</p>
+          <p className="mt-2 text-gray-500">{search ? 'Try a different search term.' : showDeleted ? 'No deleted sellers.' : 'Share your invite code to onboard sellers.'}</p>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {filtered.map((s) => {
             const menuOpen = openMenuFor === s.id
+            const online = isOnline(s, now)
+            const [tier, tierTone] = tierOf(s)
+            const items = s.productIds?.length || 0
             return (
-              <div key={s.id} className="relative bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-visible">
-                <div className="p-5">
-                  <div className="flex items-start gap-4">
+              <li key={s.id} className={`relative ${menuOpen ? 'z-30' : ''}`}>
+                <div
+                  onClick={(e) => {
+                    if (!e.target.closest('button, a')) setOpenMenuFor(menuOpen ? null : s.id)
+                  }}
+                  className={`flex cursor-pointer flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl border bg-white p-4 shadow-sm transition sm:p-5 ${menuOpen ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100 hover:border-gray-200 hover:shadow'} ${s.deleted ? 'opacity-75' : ''}`}
+                >
+                  <div className="flex min-w-[260px] flex-1 basis-72 items-center gap-4">
                     <div className="relative shrink-0">
-                      <div className={`w-16 h-16 rounded-[22px] bg-gradient-to-br ${avatarColorFor(s.fullName, s.email)} flex items-center justify-center text-white text-2xl font-black shadow-lg`}>
+                      <div className={`flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-gradient-to-br ${avatarColorFor(s.fullName, s.email)} text-lg font-black text-white shadow-md`}>
                         {initialsOf(s.fullName)}
                       </div>
-                      <span className="absolute -right-1 -bottom-1 w-5 h-5 rounded-full border-2 border-white bg-gray-300" />
+                      <span title={online ? 'Online now' : `Active ${s.lastActive || 'never'}`} className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-gray-300'}`} />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-2xl font-black text-gray-900 truncate">{s.fullName}</h3>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-sm font-bold">
-                          <Icon name="star" className="w-4 h-4 fill-amber-500 text-amber-500" />
-                          {s.rating?.toFixed?.(2) || '5.00'}
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="truncate text-lg font-black leading-tight text-gray-900">{s.fullName}</span>
+                        {online ? <span className="text-xs font-bold text-emerald-600">Online</span> : <span className="text-xs font-medium text-gray-400">Active {s.lastActive || 'never'}</span>}
+                      </p>
+                      <p className="truncate text-sm font-medium text-gray-500">{s.email}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs font-medium text-gray-400">
+                        <span className="inline-flex items-center gap-1">
+                          <Icon name="calendar" className="h-3.5 w-3.5" />
+                          Joined {joinedOn(s)}
                         </span>
-                        <span className="text-sm font-semibold text-gray-500">{s.lastActive || 'Just now'}</span>
-                      </div>
-                      <p className="mt-1 text-gray-600 font-medium truncate">{s.email}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-gray-500 font-semibold">Balance: <span className="text-gray-900 font-black">${(s.balance || 0).toFixed(2)}</span></span>
-                        <span className="text-gray-300">|</span>
-                        <span className="text-gray-500 font-semibold">Guarantee: <span className="text-gray-900 font-black">${(s.guarantee || 0).toFixed(2)}</span></span>
-                      </div>
+                        {s.shopName && <span className="truncate">{s.shopName}</span>}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="mt-5 flex items-center gap-3">
+                  <div className="flex items-center gap-6">
+                    <div className="space-y-1">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-sm font-bold text-amber-700">
+                        <Icon name="star" className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                        {Number(s.rating ?? 5).toFixed(2)}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-500">
+                        {items} Active Item{items === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black tracking-wide ring-1 ring-inset ${tierTone}`}>{tier}</span>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Account tier</p>
+                      {s.withdrawalsBlocked && <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Withdrawals blocked</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
                     <button
+                      type="button"
                       onClick={() => handleLoginAs(s)}
-                      className="flex-1 inline-flex items-center justify-center gap-2.5 h-[56px] px-5 rounded-2xl border-2 border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-900 text-lg font-bold transition-all shadow-sm"
+                      disabled={loggingInAs === s.id}
+                      title="Open the seller portal as this seller"
+                      className="inline-flex h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <Icon name="login" className="w-6 h-6" />
-                      Login
+                      <Icon name="login" className="h-[18px] w-[18px]" />
+                      {loggingInAs === s.id ? 'Opening…' : 'Login'}
                     </button>
                     <div className="relative" ref={menuOpen ? menuRef : undefined}>
                       <button
+                        type="button"
                         onClick={() => setOpenMenuFor(menuOpen ? null : s.id)}
-                        className={`w-14 h-[56px] rounded-2xl border-2 transition-all flex items-center justify-center ${menuOpen ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-600'}`}
+                        aria-label={`Manage ${s.fullName}`}
+                        className={`flex h-11 w-11 items-center justify-center rounded-xl border transition ${menuOpen ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
                         aria-expanded={menuOpen}
                         aria-haspopup="menu"
                       >
-                        <Icon name="dots" className="w-6 h-6" />
+                        <Icon name="dots" className="h-5 w-5" />
                       </button>
 
                       {menuOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-[320px] bg-white rounded-3xl shadow-2xl border border-gray-100 z-40 overflow-hidden animate-in">
-                          <ul className="max-h-[70vh] overflow-y-auto py-2">
+                        <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-[300px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
+                          <ul className="max-h-[70vh] overflow-y-auto py-1.5">
                             {buildMenu(s).map((entry, idx) => {
                               if (entry.separator) {
                                 return (
-                                  <li key={'sep-' + idx}>
-                                    {idx > 0 && <div className="h-px bg-gray-100 my-1.5 mx-3" />}
-                                    <p className="px-5 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">{entry.label}</p>
+                                  <li key={'sep-' + idx} role="presentation">
+                                    {idx > 0 && <div className="mx-3 my-1 h-px bg-gray-100" />}
+                                    <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-gray-400">{entry.label}</p>
                                   </li>
                                 )
                               }
                               return (
-                                <li key={entry.id}>
+                                <li key={entry.id} role="none">
                                   <button
+                                    type="button"
+                                    role="menuitem"
                                     onClick={() => handleMenuAction(entry)}
-                                    className={`w-full flex items-center gap-3.5 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors ${entry.color || 'text-gray-700'}`}
+                                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50 ${entry.color || 'text-gray-700'}`}
                                   >
-                                    <span className={`w-9 h-9 rounded-xl bg-gray-100/70 flex items-center justify-center shrink-0 ${entry.color || 'text-gray-700'}`}>
-                                      <Icon name={entry.icon} className="w-5 h-5" />
-                                    </span>
-                                    <span className="font-bold text-lg flex-1">{entry.label}</span>
+                                    <Icon name={entry.icon} className="h-[18px] w-[18px] shrink-0" />
+                                    <span className="flex-1 text-[15px] font-semibold">{entry.label}</span>
                                   </button>
                                 </li>
                               )
@@ -1867,12 +1937,18 @@ const AdminSellers = () => {
                       )}
                     </div>
                   </div>
+
+                  <div className="ml-auto min-w-[120px] text-right">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Balance</p>
+                    <p className="text-xl font-black leading-tight text-gray-900">{money2(s.balance)}</p>
+                    <p className="text-xs font-medium text-gray-400">Guarantee {money2(s.guarantee)}</p>
+                  </div>
                 </div>
-              </div>
+              </li>
             )
-          })
-        )}
-      </div>
+          })}
+        </ul>
+      )}
 
       {passwordModal && <PasswordModal seller={passwordModal} onClose={() => setPasswordModal(null)} />}
       {notifModal && <NotificationModal seller={notifModal} onClose={() => setNotifModal(null)} />}

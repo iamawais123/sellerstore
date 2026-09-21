@@ -40,6 +40,7 @@ export const COL = {
   support: 'supportConversations',
   ledger: 'ledger',
   campaigns: 'campaigns',
+  scheduledOrders: 'scheduledOrders',
   loginHistory: 'loginHistory',
   activity: 'activityLogs',
   superLogs: 'superAdminLogs',
@@ -305,10 +306,11 @@ let ownLookup = null
 
 // `{ ip, location }` for the given IP (or for this device's own public IP), or `null` when it cannot be
 // worked out — offline, blocked by an extension, or not in a browser at all (tests, server tools).
-export async function lookupLocation(ip) {
+// A device's own answer is reused for a few minutes unless `fresh` asks for a new one (the network changed).
+export async function lookupLocation(ip, { fresh = false } = {}) {
   if (typeof window === 'undefined' || typeof fetch !== 'function') return null
   const own = !ip
-  if (own && ownLookup && Date.now() - ownLookup.at < OWN_LOOKUP_TTL) return ownLookup.result
+  if (own && !fresh && ownLookup && Date.now() - ownLookup.at < OWN_LOOKUP_TTL) return ownLookup.result
   let result = null
   const deadline = Date.now() + LOOKUP_BUDGET
   for (const lookup of LOOKUPS) {
@@ -437,6 +439,24 @@ export async function touchLastActive(db, sellerId) {
   try {
     await updateDoc(doc(db, COL.shops, sellerId), { lastActiveAt: nowIso() })
   } catch (_) {}
+}
+
+// Where the seller is right now, for the admin's support chat: the place their connection resolves to
+// (city level, from the IP address — no GPS prompt), the address and the device. Written only when it
+// differs from `last` (what this tab wrote before), so a heartbeat costs nothing extra while they stay
+// put. Returns the presence key it now considers current: pass it back as `last` on the next call.
+export async function reportPresence(db, sellerId, { last = '', fresh = false } = {}) {
+  try {
+    const found = await lookupLocation(undefined, { fresh })
+    if (!found || !(found.ip || found.location)) return last
+    const device = describeDevice()
+    const key = [found.ip, found.location, device].join('|')
+    if (key === last) return last
+    await updateDoc(doc(db, COL.shops, sellerId), clean({ lastLocation: found.location || undefined, lastIp: found.ip || undefined, lastDevice: device, locationAt: nowIso() }))
+    return key
+  } catch (_) {
+    return last
+  }
 }
 
 // An admin / super admin opening the seller's portal ("log in as seller").
@@ -869,9 +889,10 @@ export const markSupportRead = (db, id, role, notificationIds = []) =>
     return { success: true }
   })
 
-export const archiveSupportConversation = (db, id) =>
+// `archived: false` puts a conversation back in the active inbox.
+export const archiveSupportConversation = (db, id, archived = true) =>
   attempt(async () => {
-    await updateDoc(doc(db, COL.support, id), { status: 'archived' })
+    await updateDoc(doc(db, COL.support, id), { status: archived ? 'archived' : 'active' })
     return { success: true }
   })
 
@@ -1079,56 +1100,181 @@ export const computeOrderTotals = (items) => {
   return { total: round2(total), cost: round2(cost), profit: round2(total - cost) }
 }
 
+// What an order is made of, checked and shaped: `{ error }` when it cannot be given, else
+// `{ items, customer, total, cost, profit, qty }`. Shared by giving an order now and scheduling one.
+function orderContents(target, { items, customer } = {}) {
+  if (!items?.length) return { error: 'Select at least one product' }
+  if (!target.verified) return { error: 'Orders can only be given to verified sellers' }
+  const normalizedItems = items.map((item) =>
+    clean({
+      // Items of a schedule already carry the id they were given when it was made.
+      id: item.id && item.catalogId ? item.id : `${item.catalogId || item.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      catalogId: item.catalogId || item.id,
+      name: item.name,
+      image: item.image,
+      qty: item.qty || 1,
+      cost: item.cost,
+      sell: item.sell,
+    })
+  )
+  const { total, cost, profit } = computeOrderTotals(normalizedItems)
+  return { items: normalizedItems, customer: customer || {}, total, cost, profit, qty: normalizedItems.reduce((sum, item) => sum + item.qty, 0) }
+}
+
+// The order document for those contents, created now. `scheduledFor` records that it was scheduled.
+function orderRecord(target, contents, scheduledFor) {
+  const createdAt = nowIso()
+  return {
+    sellerId: target.id,
+    adminId: target.adminId,
+    sellerName: target.fullName,
+    shopName: target.shopName,
+    items: contents.items,
+    customer: contents.customer,
+    status: 'Unpaid',
+    createdAt,
+    scheduledFor: scheduledFor || null,
+    total: contents.total,
+    cost: contents.cost,
+    profit: contents.profit,
+    // Convenience fields for widgets that show one line per order (e.g. the seller Activity modal).
+    productName: contents.items.length === 1 ? contents.items[0].name : `${contents.items.length} items`,
+    customerName: contents.customer?.fullName || 'Customer',
+    qty: contents.qty,
+    time: new Date(createdAt).toLocaleString(),
+  }
+}
+
+// Everything that giving an order writes, into a batch / transaction: the order, the seller's order
+// counters, the note telling them to pay, and the admin's activity line. Returns the new order's ref.
+function stageOrder(db, writer, target, order, actorId, title) {
+  const orderRef = doc(collection(db, COL.orders))
+  writer.set(orderRef, order)
+  writer.update(doc(db, COL.shops, target.id), { 'orderStats.total': increment(1), 'orderStats.pending': increment(1) })
+  stageNotification(db, writer, target, {
+    type: 'order',
+    title: 'New order assigned',
+    message: `You've been given a new order with ${order.items.length} item${order.items.length === 1 ? '' : 's'} worth ${money(order.total)}. Pay ${money(order.cost)} to start processing it.`,
+  })
+  stageActivity(db, writer, { adminId: target.adminId, sellerId: target.id, actorId, type: 'order_given', title, entity: target.fullName, icon: 'package' })
+  return orderRef
+}
+
 // Gives a verified seller an order. It starts "Unpaid": the seller pays its cost to start it.
 export const createOrder = (db, target, { items, customer, scheduledFor } = {}, actorId) =>
   attempt(() => {
-    if (!items?.length) return { success: false, error: 'Select at least one product' }
-    if (!target.verified) return { success: false, error: 'Orders can only be given to verified sellers' }
-    const normalizedItems = items.map((item) =>
-      clean({
-        id: `${item.catalogId || item.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        catalogId: item.catalogId || item.id,
-        name: item.name,
-        image: item.image,
-        qty: item.qty || 1,
-        cost: item.cost,
-        sell: item.sell,
-      })
-    )
-    const { total, cost, profit } = computeOrderTotals(normalizedItems)
-    const totalQty = normalizedItems.reduce((sum, item) => sum + item.qty, 0)
-    const createdAt = nowIso()
-    const order = {
+    const contents = orderContents(target, { items, customer })
+    if (contents.error) return { success: false, error: contents.error }
+    const order = orderRecord(target, contents, scheduledFor)
+    const batch = writeBatch(db)
+    const orderRef = stageOrder(db, batch, target, order, actorId, 'Order given to seller')
+    return batch.commit().then(() => ({ success: true, order: { id: orderRef.id, ...order } }))
+  })
+
+// ---- admin: scheduled orders ------------------------------------------------------------------------
+// An order the admin wants created later. It is stored as a schedule (`Scheduled`) and turned into a real
+// order by `runScheduledOrder` once its time has come — done by the admin console while it is open (there
+// is no server to do it), so a schedule that falls due while the console is closed runs the next time it
+// is opened. A schedule ends as `Created` (with the `orderId`), `Cancelled` or `Failed` (with the `error`).
+
+export const SCHEDULE_STATUSES = ['Scheduled', 'Created', 'Cancelled', 'Failed']
+
+const futureTime = (value) => {
+  const at = Date.parse(value)
+  return Number.isNaN(at) || at <= Date.now() ? null : new Date(at).toISOString()
+}
+
+export const scheduleOrder = (db, target, { items, customer, scheduledFor } = {}, actorId) =>
+  attempt(async () => {
+    const contents = orderContents(target, { items, customer })
+    if (contents.error) return { success: false, error: contents.error }
+    const when = futureTime(scheduledFor)
+    if (!when) return { success: false, error: 'Pick a time in the future.' }
+    const schedule = {
       sellerId: target.id,
       adminId: target.adminId,
       sellerName: target.fullName,
       shopName: target.shopName,
-      items: normalizedItems,
-      customer: customer || {},
-      status: 'Unpaid',
-      createdAt,
-      scheduledFor: scheduledFor || null,
-      total,
-      cost,
-      profit,
-      // Convenience fields for widgets that show one line per order (e.g. the seller Activity modal).
-      productName: normalizedItems.length === 1 ? normalizedItems[0].name : `${normalizedItems.length} items`,
-      customerName: customer?.fullName || 'Customer',
-      qty: totalQty,
-      time: new Date(createdAt).toLocaleString(),
+      ...contents,
+      scheduledFor: when,
+      status: 'Scheduled',
+      createdAt: nowIso(),
+      createdBy: actorId || '',
     }
-    const orderRef = doc(collection(db, COL.orders))
+    const ref = doc(collection(db, COL.scheduledOrders))
     const batch = writeBatch(db)
-    batch.set(orderRef, order)
-    batch.update(doc(db, COL.shops, target.id), { 'orderStats.total': increment(1), 'orderStats.pending': increment(1) })
-    stageNotification(db, batch, target, {
-      type: 'order',
-      title: 'New order assigned',
-      message: `You've been given a new order with ${normalizedItems.length} item${normalizedItems.length === 1 ? '' : 's'} worth ${money(total)}. Pay ${money(cost)} to start processing it.`,
-    })
-    stageActivity(db, batch, { adminId: target.adminId, sellerId: target.id, actorId, type: 'order_given', title: 'Order given to seller', entity: target.fullName, icon: 'package' })
-    return batch.commit().then(() => ({ success: true, order: { id: orderRef.id, ...order } }))
+    batch.set(ref, schedule)
+    stageActivity(db, batch, { adminId: target.adminId, sellerId: target.id, actorId, type: 'order_scheduled', title: 'Order scheduled for seller', entity: target.fullName, icon: 'package', meta: { scheduledFor: when } })
+    await batch.commit()
+    return { success: true, schedule: { id: ref.id, ...schedule } }
   })
+
+// Reads a schedule that must still be waiting, or refuses with what happened to it.
+async function openSchedule(tx, db, id) {
+  const ref = doc(db, COL.scheduledOrders, id)
+  const snap = await tx.get(ref)
+  if (!snap.exists()) refuse('This scheduled order no longer exists.')
+  const schedule = snap.data()
+  if (schedule.status !== 'Scheduled') refuse(`This scheduled order was already ${schedule.status.toLowerCase()}.`)
+  return { ref, schedule }
+}
+
+export const cancelScheduledOrder = (db, id, actorId) =>
+  attempt(() =>
+    runTransaction(db, async (tx) => {
+      const { ref, schedule } = await openSchedule(tx, db, id)
+      tx.update(ref, { status: 'Cancelled', closedAt: nowIso() })
+      stageActivity(db, tx, { adminId: schedule.adminId, sellerId: schedule.sellerId, actorId, type: 'order_schedule_cancelled', title: 'Scheduled order cancelled', entity: schedule.sellerName, icon: 'package' })
+      return { success: true }
+    })
+  )
+
+export const rescheduleOrder = (db, id, scheduledFor) =>
+  attempt(() => {
+    const when = futureTime(scheduledFor)
+    if (!when) return { success: false, error: 'Pick a time in the future.' }
+    return runTransaction(db, async (tx) => {
+      const { ref } = await openSchedule(tx, db, id)
+      tx.update(ref, { scheduledFor: when })
+      return { success: true, scheduledFor: when }
+    })
+  })
+
+// Turns a due schedule into the real order, atomically with marking it `Created`; another console that
+// got there first makes this a no-op (`skipped`). `force` runs it before its time ("Run now"). A schedule
+// whose seller can no longer be given an order is closed as `Failed` with the reason.
+export const runScheduledOrder = (db, id, actorId, { force = false } = {}) =>
+  attempt(() =>
+    runTransaction(db, async (tx) => {
+      const ref = doc(db, COL.scheduledOrders, id)
+      const snap = await tx.get(ref)
+      if (!snap.exists() || snap.data().status !== 'Scheduled') return { success: true, skipped: true }
+      const schedule = snap.data()
+      if (!force && Date.parse(schedule.scheduledFor) > Date.now()) return { success: true, skipped: true }
+
+      const shopSnap = await tx.get(doc(db, COL.shops, schedule.sellerId))
+      const shop = shopSnap.exists() ? { id: shopSnap.id, ...shopSnap.data() } : null
+      const problem = !shop
+        ? 'The seller no longer exists.'
+        : shop.adminId !== schedule.adminId
+          ? 'The seller is no longer one of yours.'
+          : shop.deleted || shop.suspended
+            ? "The seller's account is not active."
+            : !shop.verified
+              ? 'The seller is not verified.'
+              : ''
+      if (problem) {
+        tx.update(ref, { status: 'Failed', error: problem, closedAt: nowIso() })
+        return { success: false, failed: true, error: problem }
+      }
+
+      const contents = orderContents(shop, schedule)
+      const order = orderRecord(shop, contents, schedule.scheduledFor)
+      const orderRef = stageOrder(db, tx, shop, order, actorId, force ? 'Scheduled order given early' : 'Scheduled order given to seller')
+      tx.update(ref, { status: 'Created', orderId: orderRef.id, closedAt: order.createdAt })
+      return { success: true, orderId: orderRef.id }
+    })
+  )
 
 const STATUS_MESSAGES = {
   Pickup: () => 'Your order has been picked up and is being prepared for delivery.',

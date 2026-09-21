@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 import { after, before, beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing'
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import * as shop from '../src/firebase/shopData.js'
 
 const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080').split(':')
@@ -78,6 +78,23 @@ describe('the shop lifecycle', () => {
     await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, adminId: 'a2' }))
     await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, kyc: { ...good.kyc, status: 'Approved' } }))
     await assertSucceeds(setDoc(doc(db('s1'), 'shops/s1'), good))
+  })
+
+  it('lets a seller report where they are (for the admin\'s support chat), and nothing else with it', async () => {
+    await verifiedShop({ balance: 0 })
+    const place = { lastLocation: 'Shahkot, Punjab, Pakistan', lastIp: '203.0.113.7', lastDevice: 'Desktop • Windows • Chrome', locationAt: now }
+    await assertSucceeds(updateDoc(doc(db('s1'), 'shops/s1'), place))
+    const stored = await read(db('a1'), 'shops/s1')
+    assert.equal(stored.lastLocation, 'Shahkot, Punjab, Pakistan')
+    // the admin who owns the seller reads it live
+    assert.equal((await getDoc(doc(db('a1'), 'shops/s1'))).data().lastIp, '203.0.113.7')
+    // bounded, string-only, and never alongside anything the seller may not change
+    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { lastLocation: 'x'.repeat(161) }))
+    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { lastLocation: 42 }))
+    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { ...place, guarantee: 500 }))
+    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { ...place, rating: 4 }))
+    // another seller cannot write it
+    await assertFails(updateDoc(doc(db('s2'), 'shops/s1'), place))
   })
 
   it('only lets a seller create their own shop, and only if they really are a seller', async () => {
@@ -265,6 +282,131 @@ describe('orders', () => {
     assert.equal((await shop.setOrderStatus(db('a2'), { ...target, adminId: 'a2' }, id, 'Delivered', 'a2')).success, false)
     assert.equal((await shop.setOrderStatus(db('a1'), target, id, 'Nonsense', 'a1')).success, false)
     assert.equal((await shop.setOrderStatus(db('s1'), target, id, 'Delivered', 's1')).success, false)
+  })
+})
+
+describe('scheduled orders', () => {
+  const inAnHour = () => new Date(Date.now() + 3600e3).toISOString()
+  const schedulesOf = async (s = db('a1')) => (await getDocs(query(collection(s, 'scheduledOrders'), where('adminId', '==', 'a1')))).docs.map((d) => ({ id: d.id, ...d.data() }))
+  const ordersOf = async () => (await getDocs(query(collection(db('a1'), 'orders'), where('adminId', '==', 'a1')))).docs.map((d) => ({ id: d.id, ...d.data() }))
+  // Makes a waiting schedule due, the way time passing would.
+  const makeDue = (id) => env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `scheduledOrders/${id}`), { scheduledFor: new Date(Date.now() - 1000).toISOString() }))
+  const give = async (target, scheduledFor = inAnHour()) => {
+    const made = await shop.scheduleOrder(db('a1'), target, { items: [ITEM], customer: { fullName: 'Buyer' }, scheduledFor }, 'a1')
+    assert.equal(made.success, true, made.error)
+    return made.schedule.id
+  }
+
+  it('stores a schedule without creating the order, and hides it from the seller', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    const id = await give(target)
+    const [stored] = await schedulesOf()
+    assert.equal(stored.status, 'Scheduled')
+    assert.deepEqual([stored.total, stored.cost, stored.profit, stored.qty], [50, 30, 20, 2])
+    assert.equal((await ordersOf()).length, 0)
+    assert.equal((await read(db('a1'), 'shops/s1')).orderStats.total, 0)
+    await assertFails(getDoc(doc(db('s1'), `scheduledOrders/${id}`)))
+    await assertFails(getDoc(doc(db('a2'), `scheduledOrders/${id}`)))
+    const log = await getDocs(query(collection(db('a1'), 'activityLogs'), where('adminId', '==', 'a1')))
+    assert.ok(log.docs.some((d) => d.data().type === 'order_scheduled'))
+  })
+
+  it('refuses a time that has passed, no items, and a seller who is not verified', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const past = new Date(Date.now() - 60e3).toISOString()
+    assert.match((await shop.scheduleOrder(db('a1'), target, { items: [ITEM], scheduledFor: past }, 'a1')).error, /future/)
+    assert.match((await shop.scheduleOrder(db('a1'), target, { items: [ITEM], scheduledFor: 'soon' }, 'a1')).error, /future/)
+    assert.equal((await shop.scheduleOrder(db('a1'), target, { items: [], scheduledFor: inAnHour() }, 'a1')).success, false)
+    assert.equal((await shop.scheduleOrder(db('a1'), { ...target, verified: false }, { items: [ITEM], scheduledFor: inAnHour() }, 'a1')).success, false)
+    // the rules refuse it even when the client check is bypassed
+    const forged = { ...ITEM, id: 'x' }
+    await assertFails(setDoc(doc(db('a2'), 'scheduledOrders/forged'), { sellerId: 's1', adminId: 'a2', items: [forged], total: 50, cost: 30, profit: 20, qty: 2, scheduledFor: inAnHour(), status: 'Scheduled', createdAt: now }))
+    await assertFails(setDoc(doc(db('a1'), 'scheduledOrders/created'), { sellerId: 's1', adminId: 'a1', items: [forged], total: 50, cost: 30, profit: 20, qty: 2, scheduledFor: inAnHour(), status: 'Created', createdAt: now }))
+    assert.equal((await schedulesOf()).length, 0)
+  })
+
+  it('leaves a schedule alone before its time, and runs it early on request', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const id = await give(target)
+    const early = await shop.runScheduledOrder(db('a1'), id, 'a1')
+    assert.deepEqual([early.success, early.skipped], [true, true])
+    assert.equal((await ordersOf()).length, 0)
+
+    const forced = await shop.runScheduledOrder(db('a1'), id, 'a1', { force: true })
+    assert.equal(forced.success, true)
+    const [order] = await ordersOf()
+    assert.equal(order.id, forced.orderId)
+    assert.equal(order.status, 'Unpaid')
+    assert.equal(order.customer.fullName, 'Buyer')
+    assert.deepEqual([order.total, order.cost, order.profit], [50, 30, 20])
+    assert.ok(order.scheduledFor)
+    const [stored] = await schedulesOf()
+    assert.deepEqual([stored.status, stored.orderId], ['Created', order.id])
+    assert.ok(stored.closedAt)
+    assert.deepEqual((await read(db('s1'), 'shops/s1')).orderStats, { total: 1, pending: 1, delivered: 0 })
+  })
+
+  it('creates a due order exactly once, even when two consoles run it at the same moment', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const id = await give(target)
+    await makeDue(id)
+    const results = await Promise.all([shop.runScheduledOrder(db('a1'), id, 'a1'), shop.runScheduledOrder(db('sa1'), id, 'sa1')])
+    assert.equal(results.filter((r) => r.orderId).length, 1)
+    assert.equal((await ordersOf()).length, 1)
+    assert.equal((await read(db('s1'), 'shops/s1')).orderStats.total, 1)
+    // and the seller is told once
+    const notes = await getDocs(query(collection(db('a1'), 'notifications'), where('adminId', '==', 'a1')))
+    assert.equal(notes.docs.filter((d) => d.data().title === 'New order assigned').length, 1)
+  })
+
+  it('closes a due schedule as Failed when the seller can no longer be given an order', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const id = await give(target)
+    await makeDue(id)
+    assert.equal((await shop.setSuspended(db('a1'), target, true, 'a1')).success, true)
+    const result = await shop.runScheduledOrder(db('a1'), id, 'a1')
+    assert.equal(result.success, false)
+    assert.match(result.error, /not active/)
+    const [stored] = await schedulesOf()
+    assert.equal(stored.status, 'Failed')
+    assert.match(stored.error, /not active/)
+    assert.equal((await ordersOf()).length, 0)
+  })
+
+  it('can be cancelled or moved while waiting, and not once it has closed', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const id = await give(target)
+    const later = new Date(Date.now() + 2 * 3600e3).toISOString()
+    assert.equal((await shop.rescheduleOrder(db('a1'), id, later)).success, true)
+    assert.equal((await schedulesOf())[0].scheduledFor, later)
+    assert.match((await shop.rescheduleOrder(db('a1'), id, new Date(Date.now() - 1000).toISOString())).error, /future/)
+
+    assert.equal((await shop.cancelScheduledOrder(db('a1'), id, 'a1')).success, true)
+    assert.equal((await schedulesOf())[0].status, 'Cancelled')
+    assert.match((await shop.cancelScheduledOrder(db('a1'), id, 'a1')).error, /already cancelled/)
+    assert.match((await shop.rescheduleOrder(db('a1'), id, later)).error, /already cancelled/)
+    // a cancelled schedule never becomes an order
+    await makeDue(id)
+    assert.equal((await shop.runScheduledOrder(db('a1'), id, 'a1', { force: true })).skipped, true)
+    assert.equal((await ordersOf()).length, 0)
+    // and the rules will not reopen it either
+    await assertFails(updateDoc(doc(db('a1'), `scheduledOrders/${id}`), { status: 'Scheduled' }))
+  })
+
+  it('belongs to the admin who made it: no other admin or seller can read or change it', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const id = await give(target)
+    await assertFails(schedulesOf(db('a2')))
+    await assertFails(getDoc(doc(db('a2'), `scheduledOrders/${id}`)))
+    assert.equal((await getDocs(query(collection(db('a2'), 'scheduledOrders'), where('adminId', '==', 'a2')))).size, 0)
+    assert.equal((await shop.cancelScheduledOrder(db('a2'), id, 'a2')).success, false)
+    assert.equal((await shop.runScheduledOrder(db('a2'), id, 'a2', { force: true })).success, false)
+    await assertFails(updateDoc(doc(db('s1'), `scheduledOrders/${id}`), { status: 'Cancelled' }))
+    await assertFails(updateDoc(doc(db('a1'), `scheduledOrders/${id}`), { total: 1 }))
+    await assertFails(deleteDoc(doc(db('a1'), `scheduledOrders/${id}`)))
+    assert.equal((await schedulesOf())[0].status, 'Scheduled')
+    // a super admin can see every schedule
+    assert.equal((await getDocs(collection(db('sa1'), 'scheduledOrders'))).size, 1)
   })
 })
 
@@ -466,6 +608,21 @@ describe('support chat', () => {
     // and other sellers / admins cannot read it
     await assertFails(getDoc(doc(db('s2'), `supportConversations/${shop.conversationId('s1')}`)))
     await assertFails(getDoc(doc(db('a2'), `supportConversations/${shop.conversationId('s1')}`)))
+  })
+
+  it('lets the admin archive a conversation and put it back, and a reply reopens it', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const id = shop.conversationId('s1')
+    await shop.sendSupportMessage(db('s1'), target, 'seller', 'Help me')
+    assert.equal((await shop.archiveSupportConversation(db('a1'), id)).success, true)
+    assert.equal((await read(db('a1'), `supportConversations/${id}`)).status, 'archived')
+    assert.equal((await shop.archiveSupportConversation(db('a1'), id, false)).success, true)
+    assert.equal((await read(db('a1'), `supportConversations/${id}`)).status, 'active')
+    await shop.archiveSupportConversation(db('a1'), id)
+    await shop.sendSupportMessage(db('a1'), target, 'admin', 'Back again')
+    assert.equal((await read(db('a1'), `supportConversations/${id}`)).status, 'active')
+    // another admin cannot touch it
+    assert.equal((await shop.archiveSupportConversation(db('a2'), id)).success, false)
   })
 
   it('greets a new seller with the admin\'s welcome and a notification, and never rewrites the thread', async () => {

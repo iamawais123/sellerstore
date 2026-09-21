@@ -303,15 +303,26 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!sellerId || !identityReady || impersonation || !shop?.id || shop.id !== sellerId) return undefined
     const { db } = getServices(SELLER_APP)
-    const beat = () => {
-      if (document.visibilityState === 'visible') shopData.touchLastActive(db, sellerId)
+    // Each beat also reports where the seller is (their admin sees it live in support chat); the place is
+    // only written when it changes. Coming back online re-checks at once, since the network may be new.
+    let reported = ''
+    let checking = false
+    const beat = async (event) => {
+      if (document.visibilityState !== 'visible') return
+      shopData.touchLastActive(db, sellerId)
+      if (checking) return
+      checking = true
+      reported = await shopData.reportPresence(db, sellerId, { last: reported, fresh: event?.type === 'online' })
+      checking = false
     }
     beat()
     const timer = setInterval(beat, 2 * 60 * 1000)
     document.addEventListener('visibilitychange', beat)
+    window.addEventListener('online', beat)
     return () => {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', beat)
+      window.removeEventListener('online', beat)
     }
   }, [sellerId, identityReady, !!impersonation, shop?.id])
 

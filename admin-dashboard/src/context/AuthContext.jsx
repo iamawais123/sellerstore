@@ -16,6 +16,7 @@ import {
 } from '../firebase/accounts'
 import { describeError, getServices } from '../firebase/core'
 import * as shopData from '../firebase/shopData'
+import { dueSchedules } from '../lib/schedules'
 
 const AuthContext = createContext(null)
 
@@ -199,12 +200,13 @@ export function AuthProvider({ children }) {
   const [campaigns, setCampaigns] = useState(EMPTY)
   const [loginHistory, setLoginHistory] = useState(EMPTY)
   const [conversations, setConversations] = useState(EMPTY)
+  const [schedules, setSchedules] = useState(EMPTY)
   const [adminLogs, setAdminLogs] = useState(EMPTY)
   const [dataError, setDataError] = useState('')
 
   useEffect(() => {
     const clear = () => {
-      ;[setShops, setOrders, setWithdrawals, setPayoutMethods, setNotifications, setLedger, setCampaigns, setLoginHistory, setConversations, setAdminLogs].forEach((set) => set(EMPTY))
+      ;[setShops, setOrders, setWithdrawals, setPayoutMethods, setNotifications, setLedger, setCampaigns, setLoginHistory, setConversations, setSchedules, setAdminLogs].forEach((set) => set(EMPTY))
     }
     if (!admin.id || !identityReady) {
       clear()
@@ -228,11 +230,49 @@ export function AuthProvider({ children }) {
       shopData.watchList(db, shopData.COL.campaigns, mine, setCampaigns, onError),
       shopData.watchList(db, shopData.COL.loginHistory, mine, setLoginHistory, onError, shopData.mapTimed),
       shopData.watchList(db, shopData.COL.support, mine, setConversations, onError, shopData.mapConversation),
+      shopData.watchList(db, shopData.COL.scheduledOrders, mine, setSchedules, onError),
       // The 100 most recent lines of this admin's network activity (needs the composite index in firestore.indexes.json).
       shopData.watchList(db, shopData.COL.activity, [...mine, shopData.orderBy('at', 'desc'), shopData.limit(100)], setAdminLogs, onError, shopData.mapLog),
     ]
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe())
   }, [admin.id, identityApp, identityReady])
+
+  // Scheduled orders are created here: while the console is open, whatever has come due is turned into an
+  // order (there is no server to do it, so a schedule that falls due while every console is closed runs the
+  // next time one is opened). Two consoles racing for the same schedule are settled by the transaction.
+  const schedulesRef = useRef(EMPTY)
+  schedulesRef.current = schedules
+  const runDueRef = useRef(null)
+  useEffect(() => {
+    if (!admin.id || !identityReady) return undefined
+    const retryAfter = new Map()
+    let busy = false
+    runDueRef.current = async () => {
+      if (busy) return
+      busy = true
+      try {
+        const { db, auth } = getServices(identityApp)
+        const actorId = auth.currentUser?.uid || admin.id
+        for (const item of dueSchedules(schedulesRef.current)) {
+          if ((retryAfter.get(item.id) || 0) > Date.now()) continue
+          const result = await shopData.runScheduledOrder(db, item.id, actorId)
+          // A refusal the schedule records itself (`failed`) is final; anything else (network, rules) is retried in a minute.
+          if (!result.success && !result.failed) retryAfter.set(item.id, Date.now() + 60 * 1000)
+        }
+      } finally {
+        busy = false
+      }
+    }
+    runDueRef.current()
+    const timer = setInterval(() => runDueRef.current(), 10 * 1000)
+    return () => {
+      clearInterval(timer)
+      runDueRef.current = null
+    }
+  }, [admin.id, identityApp, identityReady])
+  useEffect(() => {
+    runDueRef.current?.()
+  }, [schedules])
 
   const sellersRegistry = shops
   const ordersBySeller = useMemo(() => groupBy(shopData.sortNewest(orders), 'sellerId'), [orders])
@@ -477,7 +517,7 @@ export function AuthProvider({ children }) {
 
   const markAdminNotificationsRead = (ids) => shopData.markNotificationsRead(acting().db, ids)
 
-  const archiveSupportConversation = (conversationId) => shopData.archiveSupportConversation(acting().db, conversationId)
+  const archiveSupportConversation = (conversationId, archived = true) => shopData.archiveSupportConversation(acting().db, conversationId, archived)
 
   // ---- withdrawals ----------------------------------------------------------------------------------------
 
@@ -530,6 +570,17 @@ export function AuthProvider({ children }) {
 
   const updateGivenOrderStatus = (sellerId, orderId, status) =>
     withShop(sellerId, (db, target, actorId) => shopData.setOrderStatus(db, target, orderId, status, actorId))
+
+  // ---- scheduled orders (created by the admin, turned into real orders when their time comes) ------------------
+
+  const scheduleOrderForSeller = (sellerId, order) => withShop(sellerId, (db, target, actorId) => shopData.scheduleOrder(db, target, order, actorId))
+
+  const cancelScheduledOrder = (id) => shopData.cancelScheduledOrder(acting().db, id, acting().actorId)
+
+  const rescheduleOrder = (id, scheduledFor) => shopData.rescheduleOrder(acting().db, id, scheduledFor)
+
+  // Creates the order now instead of at its time.
+  const runScheduledOrderNow = (id) => shopData.runScheduledOrder(acting().db, id, acting().actorId, { force: true })
 
   // ---- views ------------------------------------------------------------------------------------------------------
 
@@ -644,6 +695,11 @@ export function AuthProvider({ children }) {
         getSellerSlotInfo,
         getVerifiedSellersForAdmin,
         createOrderForSeller,
+        scheduledOrders: schedules,
+        scheduleOrderForSeller,
+        cancelScheduledOrder,
+        rescheduleOrder,
+        runScheduledOrderNow,
         updateGivenOrderStatus,
       }}
     >

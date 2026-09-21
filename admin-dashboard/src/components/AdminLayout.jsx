@@ -147,6 +147,8 @@ const AdminLayout = () => {
   const currentPage =
     [...manageItems, ...communicationItems, ...financeItems, ...activityItems].find((item) => item.to === location.pathname) || manageItems[0]
 
+  const ownHeader = ['/orders', '/sellers'].includes(location.pathname)
+
   const handleCopyInvite = async () => {
     try {
       await navigator.clipboard.writeText(admin.inviteCode)
@@ -407,7 +409,8 @@ const AdminLayout = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              <div className="flex items-center space-x-2">
+              {/* Pages with a header of their own (Orders, Sellers) show their title there, not twice. */}
+              <div className={`items-center space-x-2 ${ownHeader ? 'hidden' : 'flex'}`}>
                 <span className="text-gray-500">{currentPage.icon}</span>
                 <h1 className="text-xl lg:text-2xl font-bold text-gray-900">{currentPage.label}</h1>
               </div>
