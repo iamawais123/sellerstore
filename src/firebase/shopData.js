@@ -798,6 +798,32 @@ export const removeProductFromShop = (db, sellerId, catalogId, actorId = sellerI
     })
   )
 
+// Wipes every product from the seller's shop in one go — the "clear all" a seller reaches for once
+// their slots are full and they want to restock from scratch instead of removing products one at a time.
+export const clearShopProducts = (db, sellerId, actorId = sellerId) =>
+  attempt(() =>
+    runTransaction(db, async (tx) => {
+      const shopRef = doc(db, COL.shops, sellerId)
+      const shopSnap = await tx.get(shopRef)
+      if (!shopSnap.exists()) refuse('Seller not found')
+      const shop = shopSnap.data()
+      if (shop.allowProductRemoval === false) refuse('Product removal is disabled by admin for your store')
+      const existing = Array.isArray(shop.productIds) ? shop.productIds : []
+      if (!existing.length) refuse('Your shop is already empty')
+      tx.update(shopRef, { productIds: [] })
+      stageActivity(db, tx, {
+        adminId: shop.adminId,
+        sellerId,
+        actorId,
+        type: 'seller_products_cleared',
+        title: `All ${existing.length} product${existing.length === 1 ? '' : 's'} removed from shop`,
+        entity: shop.fullName,
+        icon: 'package',
+      })
+      return { success: true, removed: existing.length }
+    })
+  )
+
 export const markNotificationsRead = (db, ids) =>
   attempt(async () => {
     if (!ids.length) return { success: true }

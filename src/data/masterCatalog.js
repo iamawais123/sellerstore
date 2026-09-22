@@ -130,4 +130,9 @@ export const masterCatalog = [...curated, ...imported]
 
 export const catalogCategories = ['All categories', ...Array.from(new Set(masterCatalog.map((item) => item.category)))]
 
-export const findCatalogProduct = (id) => masterCatalog.find((item) => item.id === id)
+// A seller's shop stores product ids (`seller.productIds`) and resolves them against this catalog on
+// every render — with ~5,000 entries, scanning the array per id (Array.find) adds up fast. Callers that
+// resolve ids should use this map (O(1) per id) instead of masterCatalog.find(...).
+export const catalogById = new Map(masterCatalog.map((item) => [item.id, item]))
+
+export const findCatalogProduct = (id) => catalogById.get(id)

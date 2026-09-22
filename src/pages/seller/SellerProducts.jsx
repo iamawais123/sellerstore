@@ -1,19 +1,28 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { catalogCategories } from '../../data/masterCatalog'
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`
 
+// The catalog now holds ~5,000 products — rendering every match at once means thousands of <img>
+// tags firing off network requests in one go. Paginate the grid instead; "Show more" reveals another
+// page at a time, and each thumbnail lazy-loads so only what's on screen actually fetches.
+const PAGE_SIZE = 60
+
 const CatalogModal = ({ seller, onClose }) => {
-  const { getMasterCatalog, getSellerShopProductIds, getSellerSlotInfo, addProductsToShop, quickAddRandomToShop } = useAuth()
+  const { getMasterCatalog, getSellerShopProductIds, getSellerSlotInfo, addProductsToShop, quickAddRandomToShop, clearShopProducts } = useAuth()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All categories')
   const [selected, setSelected] = useState([])
   const [toast, setToast] = useState('')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   const catalog = getMasterCatalog()
   const existingIds = getSellerShopProductIds(seller.id)
   const slots = getSellerSlotInfo(seller.id)
+  const full = slots.remaining <= 0
 
   const available = useMemo(() => {
     const existingSet = new Set(existingIds)
@@ -25,10 +34,23 @@ const CatalogModal = ({ seller, onClose }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, category, query, existingIds.join(',')])
 
-  const toggle = (id) => setSelected((current) => current.includes(id) ? current.filter((x) => x !== id) : [...current, id])
+  // A new search or category swaps out the whole result set, so start back at one page of it.
+  useEffect(() => setVisibleCount(PAGE_SIZE), [query, category])
 
-  const allSelected = available.length > 0 && available.every((product) => selected.includes(product.id))
-  const toggleSelectAll = () => setSelected(allSelected ? [] : available.map((product) => product.id))
+  const visible = available.slice(0, visibleCount)
+  const canShowMore = visibleCount < available.length
+
+  // Selecting can't outrun the slots actually available, so it stops taking new picks once it hits the cap.
+  const toggle = (id) =>
+    setSelected((current) => {
+      if (current.includes(id)) return current.filter((x) => x !== id)
+      if (current.length >= slots.remaining) return current
+      return [...current, id]
+    })
+
+  const selectableIds = useMemo(() => available.slice(0, slots.remaining).map((product) => product.id), [available, slots.remaining])
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.includes(id))
+  const toggleSelectAll = () => setSelected(allSelected ? [] : selectableIds)
 
   const handleAddSelected = async () => {
     const result = await addProductsToShop(seller.id, selected)
@@ -41,14 +63,23 @@ const CatalogModal = ({ seller, onClose }) => {
     }
   }
 
+  const quickAddCount = Math.min(50, slots.remaining)
   const handleQuickAdd = async () => {
-    const result = await quickAddRandomToShop(seller.id, 50)
+    const result = await quickAddRandomToShop(seller.id, quickAddCount)
     if (result.success) {
       setToast(`Quick-added ${result.added} random product${result.added === 1 ? '' : 's'} to your shop.`)
       setTimeout(onClose, 700)
     } else {
       setToast(result.error || 'Could not add products')
     }
+  }
+
+  const handleClearAll = async () => {
+    setClearing(true)
+    const result = await clearShopProducts()
+    setClearing(false)
+    setConfirmClear(false)
+    setToast(result.success ? `Removed ${result.removed} product${result.removed === 1 ? '' : 's'} — your shop is empty again.` : result.error || 'Could not clear products')
   }
 
   return (
@@ -62,46 +93,86 @@ const CatalogModal = ({ seller, onClose }) => {
           <button onClick={onClose} className="rounded-xl p-2 text-2xl leading-none text-gray-400 hover:bg-gray-100">×</button>
         </div>
 
-        <div className="space-y-3 border-b border-gray-100 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search products by name..." className="flex-1 rounded-2xl border-2 border-gray-100 bg-white px-5 py-3 focus:border-indigo-500 focus:outline-none" />
-            <select value={category} onChange={(event) => setCategory(event.target.value)} className="rounded-2xl border-2 border-gray-100 bg-white px-4 py-3 font-bold text-gray-700 focus:border-indigo-500 focus:outline-none">
-              {catalogCategories.map((item) => <option key={item}>{item}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-bold text-gray-500">Remaining slots: <span className="text-gray-900">{slots.remaining} / {slots.limit}</span></p>
-            <button onClick={handleQuickAdd} className="rounded-xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700 hover:bg-indigo-100">✨ Quick add 50 random</button>
-          </div>
-          <label className="flex items-center gap-2 text-sm font-bold text-gray-600">
-            <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-            Select all ({available.length})
-          </label>
-        </div>
-
-        {toast && <p className="mx-5 mt-3 rounded-xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">{toast}</p>}
-
-        <div className="flex-1 overflow-y-auto p-5">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {available.map((product) => {
-              const isSelected = selected.includes(product.id)
-              return (
-                <button key={product.id} onClick={() => toggle(product.id)} className={`relative overflow-hidden rounded-2xl border-2 bg-white text-left transition ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-gray-100'}`}>
-                  <span className={`absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-200 bg-white/80'}`}>
-                    {isSelected && <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                  </span>
-                  <img src={product.image} alt={product.name} className="aspect-square w-full object-cover" />
-                  <div className="p-2.5">
-                    <p className="line-clamp-2 min-h-9 text-xs font-bold text-gray-900">{product.name}</p>
-                  </div>
+        {full ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-500">
+              <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            </div>
+            <div>
+              <p className="text-xl font-black text-gray-900">{slots.limit} / {slots.limit} slots full</p>
+              <p className="mt-1 text-gray-500">Remove a few products from "My Products", or clear your whole shop below to restock from scratch.</p>
+            </div>
+            {seller.allowProductRemoval !== false &&
+              (confirmClear ? (
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <span className="font-bold text-rose-600">Remove all {slots.used} products?</span>
+                  <button onClick={handleClearAll} disabled={clearing} className="rounded-xl bg-rose-600 px-4 py-2 font-black text-white hover:bg-rose-700 disabled:opacity-60">
+                    {clearing ? 'Clearing…' : 'Yes, clear all'}
+                  </button>
+                  <button onClick={() => setConfirmClear(false)} className="rounded-xl px-4 py-2 font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmClear(true)} className="rounded-xl border-2 border-rose-200 px-5 py-2.5 font-black text-rose-600 hover:bg-rose-50">
+                  Clear all products
                 </button>
-              )
-            })}
+              ))}
+            {toast && <p className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">{toast}</p>}
           </div>
-          {!available.length && <p className="py-16 text-center font-bold text-gray-400">No products match your search.</p>}
-        </div>
+        ) : (
+          <>
+            <div className="space-y-3 border-b border-gray-100 p-5">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search products by name..." className="flex-1 rounded-2xl border-2 border-gray-100 bg-white px-5 py-3 focus:border-indigo-500 focus:outline-none" />
+                <select value={category} onChange={(event) => setCategory(event.target.value)} className="rounded-2xl border-2 border-gray-100 bg-white px-4 py-3 font-bold text-gray-700 focus:border-indigo-500 focus:outline-none">
+                  {catalogCategories.map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-bold text-gray-500">Remaining slots: <span className="text-gray-900">{slots.remaining} / {slots.limit}</span></p>
+                <button onClick={handleQuickAdd} className="rounded-xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700 hover:bg-indigo-100">✨ Quick add {quickAddCount} random</button>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-600">
+                <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                Select all ({available.length})
+              </label>
+            </div>
 
-        {selected.length > 0 && (
+            {toast && <p className="mx-5 mt-3 rounded-xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">{toast}</p>}
+
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {visible.map((product) => {
+                  const isSelected = selected.includes(product.id)
+                  const disabled = !isSelected && selected.length >= slots.remaining
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => toggle(product.id)}
+                      disabled={disabled}
+                      className={`relative overflow-hidden rounded-2xl border-2 bg-white text-left transition ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-gray-100'} ${disabled ? 'opacity-40' : ''}`}
+                    >
+                      <span className={`absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-200 bg-white/80'}`}>
+                        {isSelected && <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      </span>
+                      <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="aspect-square w-full bg-gray-50 object-cover" />
+                      <div className="p-2.5">
+                        <p className="line-clamp-2 min-h-9 text-xs font-bold text-gray-900">{product.name}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              {!available.length && <p className="py-16 text-center font-bold text-gray-400">No products match your search.</p>}
+              {canShowMore && (
+                <button onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} className="mt-4 w-full rounded-2xl border-2 border-gray-100 py-3 font-black text-gray-600 hover:bg-gray-50">
+                  Show more ({available.length - visibleCount} left)
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {!full && selected.length > 0 && (
           <div className="border-t border-gray-100 p-4">
             <button onClick={handleAddSelected} className="w-full rounded-2xl bg-indigo-600 px-5 py-4 font-black text-white hover:bg-indigo-700">
               Add {selected.length} selected product{selected.length === 1 ? '' : 's'}
@@ -114,14 +185,31 @@ const CatalogModal = ({ seller, onClose }) => {
 }
 
 const SellerProducts = () => {
-  const { seller, getSellerShopProductsFull, getSellerSlotInfo, removeProductFromShop } = useAuth()
+  const { seller, getSellerShopProductsFull, getSellerSlotInfo, removeProductFromShop, clearShopProducts } = useAuth()
   const [catalogOpen, setCatalogOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [removeError, setRemoveError] = useState('')
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [clearToast, setClearToast] = useState('')
 
   const handleRemove = async (catalogId) => {
     const result = await removeProductFromShop(seller.id, catalogId)
     if (!result.success) {
+      setRemoveError(result.error)
+      setTimeout(() => setRemoveError(''), 4000)
+    }
+  }
+
+  const handleClearAll = async () => {
+    setClearing(true)
+    const result = await clearShopProducts()
+    setClearing(false)
+    setConfirmClear(false)
+    if (result.success) {
+      setClearToast(`Removed all ${result.removed} products — your shop is empty again.`)
+      setTimeout(() => setClearToast(''), 4000)
+    } else {
       setRemoveError(result.error)
       setTimeout(() => setRemoveError(''), 4000)
     }
@@ -136,16 +224,36 @@ const SellerProducts = () => {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-gray-900">My Products</h1>
-          <p className="mt-1 text-gray-500">{slots.used} of {slots.limit} slots used · {slots.remaining} remaining</p>
+          <p className="mt-1 text-gray-500">
+            {slots.used} of {slots.limit} slots used · {slots.full ? <span className="font-black text-rose-600">Full</span> : `${slots.remaining} remaining`}
+          </p>
         </div>
-        <button
-          onClick={() => seller.verified && setCatalogOpen(true)}
-          className="rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white hover:bg-indigo-700"
-        >
-          + Add products
-        </button>
+        <div className="flex items-center gap-2">
+          {products.length > 0 && seller.allowProductRemoval !== false && (
+            confirmClear ? (
+              <div className="flex items-center gap-2 rounded-2xl border-2 border-rose-200 bg-rose-50 px-3 py-2.5">
+                <span className="text-sm font-bold text-rose-700">Remove all {products.length}?</span>
+                <button onClick={handleClearAll} disabled={clearing} className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-black text-white hover:bg-rose-700 disabled:opacity-60">
+                  {clearing ? 'Clearing…' : 'Confirm'}
+                </button>
+                <button onClick={() => setConfirmClear(false)} className="text-sm font-bold text-gray-500 hover:text-gray-700">Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmClear(true)} className="rounded-2xl border-2 border-gray-100 px-4 py-3 font-black text-gray-500 hover:bg-gray-50">
+                Clear all
+              </button>
+            )
+          )}
+          <button
+            onClick={() => seller.verified && setCatalogOpen(true)}
+            className="rounded-2xl bg-indigo-600 px-5 py-3 font-black text-white hover:bg-indigo-700"
+          >
+            + Add products
+          </button>
+        </div>
       </div>
 
+      {clearToast && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 text-center font-bold text-emerald-700">{clearToast}</div>}
       {removeError && (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-center font-bold text-rose-700">{removeError}</div>
       )}
@@ -175,7 +283,7 @@ const SellerProducts = () => {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {visible.map((product) => (
               <article key={product.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
-                <img src={product.image} alt={product.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="h-16 w-16 shrink-0 rounded-xl bg-gray-50 object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-bold text-gray-900">{product.name}</p>
                   <p className="mt-1 text-sm text-gray-500">

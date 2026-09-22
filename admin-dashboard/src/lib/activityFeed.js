@@ -122,6 +122,9 @@ export function eventsFromActivity(row, seller) {
     case 'seller_product_removed':
       push({ category: 'product', text: 'Removed a product', product: meta.items?.[0] })
       break
+    case 'seller_products_cleared':
+      push({ category: 'product', text: row.title || 'Removed all products from shop' })
+      break
     case 'payout_method_added':
       push({ category: 'payout', text: withMethod('Added a payout method', meta.method) })
       break

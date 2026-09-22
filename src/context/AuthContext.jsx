@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { masterCatalog } from '../data/masterCatalog'
+import { catalogById, masterCatalog } from '../data/masterCatalog'
 import {
   CUSTOMER_APP,
   SELLER_APP,
@@ -568,19 +568,19 @@ export function AuthProvider({ children }) {
   const getSellerShopProductIds = () => seller.productIds || EMPTY
 
   const getSellerShopProductsFull = () =>
-    (seller.productIds || EMPTY).map((id) => masterCatalog.find((item) => item.id === id)).filter(Boolean)
+    (seller.productIds || EMPTY).map((id) => catalogById.get(id)).filter(Boolean)
 
   const getSellerSlotInfo = () => {
     const limit = seller.productLimit ?? 50
     const used = (seller.productIds || EMPTY).length
-    return { used, limit, remaining: Math.max(0, limit - used) }
+    return { used, limit, remaining: Math.max(0, limit - used), full: used >= limit }
   }
 
   // What the admin's activity feed shows for each product: its name, picture and the price it sells at.
   const productDetails = (ids) =>
     Object.fromEntries(
       ids
-        .map((id) => masterCatalog.find((item) => item.id === id))
+        .map((id) => catalogById.get(id))
         .filter(Boolean)
         .map((item) => [item.id, { name: item.name, image: item.image, price: item.sell }])
     )
@@ -592,17 +592,31 @@ export function AuthProvider({ children }) {
     return shopData.addProductsToShop(db, sellerRef.current.id, catalogIds, actorId, productDetails(catalogIds))
   }
 
+  // Picks `count` random ids out of `pool` without shuffling (or even scanning) the whole catalog —
+  // a partial Fisher-Yates over just the slots being filled, so this stays fast no matter how many
+  // thousands of products the catalog holds.
+  const pickRandom = (pool, count) => {
+    const picks = []
+    const n = pool.length
+    const take = Math.min(count, n)
+    const source = [...pool]
+    for (let i = 0; i < take; i += 1) {
+      const j = i + Math.floor(Math.random() * (n - i))
+      ;[source[i], source[j]] = [source[j], source[i]]
+      picks.push(source[i])
+    }
+    return picks
+  }
+
   const quickAddRandomToShop = async (_sellerId, count = 50) => {
     const problem = needSeller()
     if (problem) return problem
     if (!seller.verified) return { success: false, error: 'Your store is not verified yet' }
     const existing = new Set(seller.productIds || EMPTY)
-    const pool = masterCatalog.filter((item) => !existing.has(item.id))
     const remaining = Math.max(0, (seller.productLimit ?? 50) - existing.size)
-    const picks = [...pool]
-      .sort(() => Math.random() - 0.5)
-      .slice(0, Math.min(count, remaining))
-      .map((item) => item.id)
+    if (!remaining) return { success: false, error: 'No slots remaining' }
+    const pool = masterCatalog.filter((item) => !existing.has(item.id))
+    const picks = pickRandom(pool, Math.min(count, remaining)).map((item) => item.id)
     if (!picks.length) return { success: false, error: 'No slots remaining' }
     return addProductsToShop(seller.id, picks)
   }
@@ -612,6 +626,15 @@ export function AuthProvider({ children }) {
     if (problem) return problem
     const { db, actorId } = acting()
     return shopData.removeProductFromShop(db, sellerRef.current.id, catalogId, actorId, productDetails([catalogId]))
+  }
+
+  // Wipes every product from the seller's shop in one go — lets a seller restock from scratch instead
+  // of removing hundreds of products one at a time once their slots are full.
+  const clearShopProducts = async () => {
+    const problem = needSeller()
+    if (problem) return problem
+    const { db, actorId } = acting()
+    return shopData.clearShopProducts(db, sellerRef.current.id, actorId)
   }
 
   return (
@@ -664,6 +687,7 @@ export function AuthProvider({ children }) {
         addProductsToShop,
         quickAddRandomToShop,
         removeProductFromShop,
+        clearShopProducts,
         paySellerOrder,
       }}
     >

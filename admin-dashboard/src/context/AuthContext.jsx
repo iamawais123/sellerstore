@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { masterCatalog } from '../data/masterCatalog'
+import { catalogById, masterCatalog } from '../data/masterCatalog'
 import {
   ADMIN_APP,
   SUPER_APP,
@@ -551,7 +551,7 @@ export function AuthProvider({ children }) {
 
   const getSellerShopProductsFull = (sellerId) =>
     getSellerShopProductIds(sellerId)
-      .map((id) => masterCatalog.find((item) => item.id === id))
+      .map((id) => catalogById.get(id))
       .filter(Boolean)
 
   const getSellerSlotInfo = (sellerId) => {
