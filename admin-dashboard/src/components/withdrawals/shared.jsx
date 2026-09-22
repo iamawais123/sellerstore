@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 export const money = (value) =>
   `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -126,7 +127,8 @@ export const ModalShell = ({ title, subtitle, icon, onClose, busy, footer, child
     }
   }, [busy, onClose])
 
-  return (
+  // Portalled to <body> so parent layout rules (e.g. space-y-* margins) can't offset the overlay.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
       onMouseDown={(event) => {
@@ -157,7 +159,8 @@ export const ModalShell = ({ title, subtitle, icon, onClose, busy, footer, child
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
         <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-5 py-3.5">{footer}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

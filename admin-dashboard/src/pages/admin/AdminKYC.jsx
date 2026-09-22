@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 
 // Browsers refuse to open a data: URL as a page, so a PDF is opened through a temporary blob URL.
@@ -93,7 +94,7 @@ const KYCDetailModal = ({ seller, onClose }) => {
   const approved = kycStatus === 'Approved'
   const rejected = kycStatus === 'Rejected'
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in max-h-[95vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 border-b border-gray-100">
@@ -247,7 +248,8 @@ const KYCDetailModal = ({ seller, onClose }) => {
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

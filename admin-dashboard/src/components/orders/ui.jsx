@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from './icons'
 
 export { money } from '../withdrawals/shared'
@@ -60,7 +61,8 @@ export const Modal = ({ title, subtitle, icon, onClose, wide, footer, children }
     }
   }, [onClose])
 
-  return (
+  // Portalled to <body> so parent layout rules (e.g. space-y-* margins) can't offset the overlay.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div role="dialog" aria-modal="true" aria-label={title} className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl ${wide ? 'sm:max-w-3xl' : 'sm:max-w-md'}`}>
         <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
@@ -80,7 +82,8 @@ export const Modal = ({ title, subtitle, icon, onClose, wide, footer, children }
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         {footer && <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-5 py-3.5">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

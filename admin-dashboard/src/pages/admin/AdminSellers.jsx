@@ -413,19 +413,19 @@ const ActivityModal = ({ seller, onClose }) => {
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="relative bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 p-6 shrink-0">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
-              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur text-white flex items-center justify-center shrink-0">
-                <Icon name="activity" className="w-8 h-8" />
+        <div className="relative bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 p-5 sm:p-6 shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start space-x-3 sm:space-x-4 min-w-0">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-white/20 backdrop-blur text-white flex items-center justify-center shrink-0">
+                <Icon name="activity" className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
-              <div>
-                <h3 className="text-3xl font-black text-white tracking-tight">{seller.shopName || seller.fullName} — Activity</h3>
-                <p className="text-blue-100 mt-1 font-medium text-lg">Full audit history of this seller account</p>
+              <div className="min-w-0">
+                <h3 className="text-xl sm:text-3xl font-black text-white tracking-tight truncate">{seller.shopName || seller.fullName} — Activity</h3>
+                <p className="text-blue-100 mt-1 font-medium text-sm sm:text-lg">Full audit history of this seller account</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <span className="inline-flex items-center px-4 py-2 rounded-2xl bg-white/20 backdrop-blur text-white font-black text-sm border border-white/30">
+            <div className="flex items-start gap-2 sm:gap-3 shrink-0">
+              <span className="hidden sm:inline-flex items-center px-4 py-2 rounded-2xl bg-white/20 backdrop-blur text-white font-black text-sm border border-white/30">
                 {seller.status || 'Active'}
               </span>
               <button onClick={onClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors">
@@ -435,21 +435,21 @@ const ActivityModal = ({ seller, onClose }) => {
           </div>
         </div>
 
-        <div className="p-5 overflow-y-auto flex-1">
-          <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
             {statCards.map((s) => (
-              <div key={s.key} className="rounded-2xl border-2 border-gray-100 bg-gray-50/50 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0`}>
+              <div key={s.key} className="rounded-2xl border-2 border-gray-100 bg-gray-50/50 p-3.5 sm:p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0`}>
                       <Icon name={s.icon} className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-gray-600 truncate">{s.label}</p>
-                      {s.sub && <p className="text-xs text-gray-400 font-medium">{s.sub}</p>}
+                      {s.sub && <p className="text-xs text-gray-400 font-medium truncate">{s.sub}</p>}
                     </div>
                   </div>
-                  <p className="text-2xl font-black text-gray-900 ml-2">{s.value}</p>
+                  <p className="text-xl sm:text-2xl font-black text-gray-900 shrink-0 whitespace-nowrap">{s.value}</p>
                 </div>
               </div>
             ))}
@@ -1714,6 +1714,7 @@ const AdminSellers = () => {
   const [search, setSearch] = useState(params.get('q') || '')
   const [showDeleted, setShowDeleted] = useState(false)
   const [openMenuFor, setOpenMenuFor] = useState(null)
+  const [menuAnchor, setMenuAnchor] = useState(null)
   const [passwordModal, setPasswordModal] = useState(null)
   const [notifModal, setNotifModal] = useState(null)
   const [activityModal, setActivityModal] = useState(null)
@@ -1732,19 +1733,54 @@ const AdminSellers = () => {
   const now = useNow(30 * 1000)
 
   const menuRef = useRef(null)
+  const menuDropdownRef = useRef(null)
   useEffect(() => {
     if (!openMenuFor) return undefined
     const onDoc = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpenMenuFor(null)
+      if (menuRef.current?.contains(e.target)) return
+      if (menuDropdownRef.current?.contains(e.target)) return
+      setOpenMenuFor(null)
     }
     const onKey = (e) => e.key === 'Escape' && setOpenMenuFor(null)
+    // Scrolling the menu's own item list must not close it — only scrolling the page behind it should.
+    const onReposition = (e) => {
+      if (menuDropdownRef.current?.contains(e.target)) return
+      setOpenMenuFor(null)
+    }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onReposition)
+    window.addEventListener('scroll', onReposition, true)
     return () => {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('scroll', onReposition, true)
     }
   }, [openMenuFor])
+
+  // Anchors the seller-actions dropdown to its trigger button, clamped so it never overflows the
+  // viewport's edges on narrow (mobile) screens, and flips above the button when there isn't
+  // enough room below.
+  const openSellerMenu = (id, event) => {
+    if (openMenuFor === id) {
+      setOpenMenuFor(null)
+      return
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    const margin = 12
+    const estMenuH = 420
+    const menuW = Math.min(300, window.innerWidth - margin * 2)
+    const left = Math.min(Math.max(rect.right - menuW, margin), window.innerWidth - menuW - margin)
+    const spaceBelow = window.innerHeight - rect.bottom
+    const openUp = spaceBelow < Math.min(estMenuH, 240) && rect.top > spaceBelow
+    setMenuAnchor(
+      openUp
+        ? { left, bottom: window.innerHeight - rect.top + 8, width: menuW, maxH: Math.max(160, rect.top - margin - 8) }
+        : { left, top: rect.bottom + 8, width: menuW, maxH: Math.max(160, spaceBelow - margin - 8) }
+    )
+    setOpenMenuFor(id)
+  }
 
   const mySellers = sellersRegistry.filter((s) => s.adminId === admin.id)
   const displaySellers = mySellers.filter((s) => (showDeleted ? s.deleted : !s.deleted))
@@ -1911,7 +1947,7 @@ const AdminSellers = () => {
                     <div className="relative" ref={menuOpen ? menuRef : undefined}>
                       <button
                         type="button"
-                        onClick={() => setOpenMenuFor(menuOpen ? null : s.id)}
+                        onClick={(e) => openSellerMenu(s.id, e)}
                         aria-label={`Manage ${s.fullName}`}
                         className={`flex h-11 w-11 items-center justify-center rounded-xl border transition ${menuOpen ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
                         aria-expanded={menuOpen}
@@ -1920,9 +1956,20 @@ const AdminSellers = () => {
                         <Icon name="dots" className="h-5 w-5" />
                       </button>
 
-                      {menuOpen && (
-                        <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-[300px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
-                          <ul className="max-h-[70vh] overflow-y-auto py-1.5">
+                      {menuOpen && menuAnchor && createPortal(
+                        <div
+                          role="menu"
+                          ref={menuDropdownRef}
+                          style={{
+                            position: 'fixed',
+                            left: menuAnchor.left,
+                            top: menuAnchor.top,
+                            bottom: menuAnchor.bottom,
+                            width: menuAnchor.width,
+                          }}
+                          className="z-50 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl"
+                        >
+                          <ul className="overflow-y-auto py-1.5" style={{ maxHeight: menuAnchor.maxH }}>
                             {buildMenu(s).map((entry, idx) => {
                               if (entry.separator) {
                                 return (
@@ -1947,7 +1994,8 @@ const AdminSellers = () => {
                               )
                             })}
                           </ul>
-                        </div>
+                        </div>,
+                        document.body
                       )}
                     </div>
                   </div>
