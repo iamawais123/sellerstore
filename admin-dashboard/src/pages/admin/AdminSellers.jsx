@@ -145,18 +145,18 @@ const PasswordModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between gap-3 p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
               <Icon name="key" className="w-7 h-7" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">Password</h3>
               <p className="text-gray-500 mt-1 font-medium">
                 Sign-in passwords are hashed and never stored anywhere in the clear, so there's no "current password" to show — not to us, not
@@ -164,12 +164,12 @@ const PasswordModal = ({ seller, onClose }) => {
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-xs font-bold uppercase tracking-[0.12em] text-gray-500 mb-2">Reset link will be sent to</label>
             <div className="flex items-center gap-3 px-4 py-3.5 bg-gray-50 border-2 border-gray-100 rounded-2xl">
@@ -236,20 +236,20 @@ const NotificationModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-gradient-to-br from-violet-500/10 to-indigo-500/10 p-6 border-b border-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="shrink-0 bg-gradient-to-br from-violet-500/10 to-indigo-500/10 p-6 border-b border-gray-100">
           <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-3">
+            <div className="flex min-w-0 items-start space-x-3">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-violet-500/20">
                 <Icon name="bell" className="w-7 h-7" />
               </div>
               <div>
                 <h3 className="text-2xl font-black text-gray-900">Notifications</h3>
-                <p className="text-gray-500 mt-1 font-medium">{seller.fullName} · {seller.email}</p>
+                <p className="text-gray-500 mt-1 font-medium truncate">{seller.fullName} · {seller.email}</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/70 text-gray-500 hover:text-gray-900 transition-colors">
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/70 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
               <Icon name="close" className="w-6 h-6" />
             </button>
           </div>
@@ -272,7 +272,7 @@ const NotificationModal = ({ seller, onClose }) => {
           </div>
         </div>
 
-        <div className="p-6 max-h-[70vh] overflow-y-auto">
+        <div className="p-6 overflow-y-auto flex-1">
           {tab === 'send' ? (
             <div className="space-y-5">
               <div>
@@ -416,21 +416,21 @@ const ActivityModal = ({ seller, onClose }) => {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="relative bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="relative shrink-0 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start space-x-4">
               <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur text-white flex items-center justify-center shrink-0">
                 <Icon name="activity" className="w-8 h-8" />
               </div>
-              <div>
-                <h3 className="text-3xl font-black text-white tracking-tight">{seller.shopName || seller.fullName} — Activity</h3>
-                <p className="text-blue-100 mt-1 font-medium text-lg">Full audit history of this seller account</p>
+              <div className="min-w-0">
+                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight truncate">{seller.shopName || seller.fullName} — Activity</h3>
+                <p className="text-blue-100 mt-1 font-medium text-base sm:text-lg">Full audit history of this seller account</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <span className="inline-flex items-center px-4 py-2 rounded-2xl bg-white/20 backdrop-blur text-white font-black text-sm border border-white/30">
+            <div className="flex shrink-0 items-start gap-3">
+              <span className="hidden sm:inline-flex items-center px-4 py-2 rounded-2xl bg-white/20 backdrop-blur text-white font-black text-sm border border-white/30">
                 {seller.status || 'Active'}
               </span>
               <button onClick={onClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors">
@@ -440,12 +440,12 @@ const ActivityModal = ({ seller, onClose }) => {
           </div>
         </div>
 
-        <div className="p-5">
-          <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="flex flex-1 flex-col overflow-hidden p-5">
+          <div className="grid shrink-0 grid-cols-1 gap-3 mb-5 sm:grid-cols-2">
             {statCards.map((s) => (
               <div key={s.key} className="rounded-2xl border-2 border-gray-100 bg-gray-50/50 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-3">
                     <div className={`w-11 h-11 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0`}>
                       <Icon name={s.icon} className="w-5 h-5" />
                     </div>
@@ -454,18 +454,18 @@ const ActivityModal = ({ seller, onClose }) => {
                       {s.sub && <p className="text-xs text-gray-400 font-medium">{s.sub}</p>}
                     </div>
                   </div>
-                  <p className="text-2xl font-black text-gray-900 ml-2">{s.value}</p>
+                  <p className="shrink-0 text-2xl font-black text-gray-900 ml-2">{s.value}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="flex border-b-2 border-gray-100 mb-4">
+          <div className="flex shrink-0 gap-1 overflow-x-auto border-b-2 border-gray-100 mb-4">
             {tabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex-1 pb-3 px-2 text-lg font-black transition-all relative ${tab === t.id ? 'text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 whitespace-nowrap pb-3 px-2 text-base sm:text-lg font-black transition-all relative ${tab === t.id ? 'text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 {t.label} <span className="text-sm opacity-70">({t.count})</span>
                 {tab === t.id && <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full" />}
@@ -473,7 +473,7 @@ const ActivityModal = ({ seller, onClose }) => {
             ))}
           </div>
 
-          <div className="max-h-[45vh] overflow-y-auto space-y-3 pr-1">
+          <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {tab === 'ledger' && (
               ledger.length === 0 ? (
                 <div className="border-2 border-dashed border-gray-200 rounded-3xl py-16 text-center">
@@ -633,25 +633,25 @@ const LoginHistoryModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between p-6 border-b border-gray-100">
-          <div className="flex items-start space-x-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-start justify-between gap-3 p-6 border-b border-gray-100">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
               <Icon name="globe" className="w-6 h-6" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-2xl font-black text-gray-900">Login history</h3>
               <p className="text-gray-500 mt-1 font-medium">Every recorded sign-in for <span className="font-bold text-gray-800">{seller.fullName}</span> with IP, device and approximate location.</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
-          <div className="relative">
+        <div className="flex flex-1 flex-col overflow-hidden p-5 space-y-4">
+          <div className="relative shrink-0">
             <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
               <Icon name="search" className="w-6 h-6" />
             </span>
@@ -664,9 +664,9 @@ const LoginHistoryModal = ({ seller, onClose }) => {
             />
           </div>
 
-          <p className="text-sm font-bold text-gray-500">{filtered.length} of {history.length} events</p>
+          <p className="shrink-0 text-sm font-bold text-gray-500">{filtered.length} of {history.length} events</p>
 
-          <div className="max-h-[55vh] overflow-y-auto space-y-3 pr-1">
+          <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {filtered.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
@@ -740,28 +740,28 @@ const BalanceModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
               <Icon name="wallet" className="w-7 h-7" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">Adjust Shop Balance</h3>
               <p className="text-gray-500 mt-1 font-medium">Current: <span className="font-black text-gray-800">${(seller.balance || 0).toFixed(2)}</span></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-base font-bold text-gray-700 mb-2">Amount (USD)</label>
             <div className="relative">
@@ -829,28 +829,28 @@ const GuaranteeModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <Icon name="shield" className="w-7 h-7" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">Adjust Guarantee Funds</h3>
               <p className="text-gray-500 mt-1 font-medium">Current: <span className="font-black text-gray-800">${(seller.guarantee || 0).toFixed(2)}</span></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-base font-bold text-gray-700 mb-2">Amount (USD)</label>
             <div className="relative">
@@ -923,28 +923,28 @@ const RatingModal = ({ seller, onClose }) => {
   const presets = [5.0, 4.5, 4.0, 3.5, 3.0]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
               <Icon name="star" className="w-7 h-7 fill-amber-400" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">Adjust Shop Rating</h3>
               <p className="text-gray-500 mt-1 font-medium">Current: <span className="font-black text-amber-500">⭐ {(seller.rating || 5).toFixed(2)}</span></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-base font-bold text-gray-700 mb-2">Rating (0.00 — 5.00)</label>
             <div className="flex items-center gap-3">
@@ -1025,28 +1025,28 @@ const ProductLimitModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
               <Icon name="box" className="w-7 h-7" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">Adjust Product Limit</h3>
               <p className="text-gray-500 mt-1 font-medium">Current: <span className="font-black text-gray-800">{seller.productLimit ?? 500} products</span></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-base font-bold text-gray-700 mb-2">Maximum products</label>
             <div className="flex items-center gap-3">
@@ -1160,19 +1160,19 @@ const ViewsBoosterModal = ({ seller, onClose }) => {
   const refreshActive = () => setActive(getActiveViewsCampaign(seller.id))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between p-5 border-b border-gray-100">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-5 border-b border-gray-100">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
               <Icon name="trending" className="w-6 h-6" />
             </div>
-            <div>
-              <h3 className="text-2xl font-black text-gray-900">Store views — {seller.fullName}</h3>
+            <div className="min-w-0">
+              <h3 className="text-2xl font-black text-gray-900 truncate">Store views — {seller.fullName}</h3>
               <p className="text-gray-500 mt-1 font-medium">Boost views instantly, schedule a drip campaign, or review past activity.</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
@@ -1376,28 +1376,28 @@ const SuspendModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className={`w-14 h-14 rounded-2xl ${isSuspended ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'} flex items-center justify-center shrink-0`}>
               <Icon name="ban" className="w-7 h-7" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">{isSuspended ? 'Unsuspend Account' : 'Suspend Account'}</h3>
               <p className="text-gray-500 mt-1 font-medium">Current status: <span className={`font-black ${isSuspended ? 'text-amber-600' : 'text-emerald-600'}`}>{isSuspended ? 'Suspended' : 'Active'}</span></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-base font-bold text-gray-700 mb-2">Reason (optional)</label>
             <textarea
@@ -1450,28 +1450,28 @@ const BlockWithdrawalsModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className={`w-14 h-14 rounded-2xl ${blocked ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0`}>
               <Icon name="credit" className="w-7 h-7" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-rose-700">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-rose-700 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">{blocked ? 'Unblock Withdrawals' : 'Block Withdrawals'}</h3>
               <p className="text-gray-500 mt-1 font-medium">Withdrawals currently: <span className={`font-black ${blocked ? 'text-rose-600' : 'text-emerald-600'}`}>{blocked ? 'Blocked' : 'Allowed'}</span></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-base font-bold text-gray-700 mb-2">Reason (optional)</label>
             <textarea
@@ -1523,28 +1523,28 @@ const AllowProductRemovalModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className={`w-14 h-14 rounded-2xl ${allowed ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0`}>
               <Icon name="box" className="w-7 h-7" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">{allowed ? 'Deny Product Removal' : 'Allow Product Removal'}</h3>
               <p className="text-gray-500 mt-1 font-medium">Product removal currently: <span className={`font-black ${allowed ? 'text-emerald-600' : 'text-rose-600'}`}>{allowed ? 'Allowed' : 'Denied'}</span></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           <div className="rounded-2xl bg-indigo-50 border-2 border-indigo-100 p-5 space-y-2">
             <p className="font-black text-indigo-800 text-lg">What does this do?</p>
             <p className="font-semibold text-indigo-700">
@@ -1601,28 +1601,28 @@ const DeleteStoreModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
-        <div className="flex items-start justify-between p-6">
-          <div className="flex items-start space-x-3">
+        <div className="flex shrink-0 items-start justify-between p-6">
+          <div className="flex min-w-0 items-start space-x-3">
             <div className={`w-14 h-14 rounded-2xl ${isDeleted ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0`}>
               <Icon name="trash" className="w-7 h-7" />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-rose-700">{seller.shopName || seller.fullName}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-rose-700 truncate">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">{isDeleted ? 'Restore Store' : 'Delete Store'}</h3>
               <p className="text-gray-500 mt-1 font-medium">Current status: <span className={`font-black ${isDeleted ? 'text-rose-600' : 'text-emerald-600'}`}>{isDeleted ? 'Deleted' : 'Active'}</span></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors shrink-0">
             <Icon name="close" className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-5">
+        <div className="px-6 pb-6 space-y-5 overflow-y-auto">
           {!isDeleted && (
             <div className="rounded-2xl bg-rose-50 border-2 border-rose-200 p-5 space-y-2">
               <p className="font-black text-rose-800 text-lg">Irreversible action</p>
