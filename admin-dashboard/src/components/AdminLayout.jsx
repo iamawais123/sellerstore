@@ -398,7 +398,7 @@ const AdminLayout = () => {
             </a>
           </div>
         )}
-        <div className="bg-white/80 backdrop-blur-xl border-b border-gray-100 px-5 lg:px-8 py-4">
+        <div className="bg-white/95 border-b border-gray-100 px-5 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <button

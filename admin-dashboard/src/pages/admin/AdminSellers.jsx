@@ -1915,8 +1915,27 @@ const AdminSellers = () => {
                       </button>
 
                       {menuOpen && (
-                        <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-[300px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
-                          <ul className="max-h-[70vh] overflow-y-auto py-1.5">
+                        <>
+                          {/* Below sm: the row can wrap, so the ⋮ button can land anywhere on the card —
+                              an absolutely-positioned dropdown anchored to it can end up mostly off-screen.
+                              A fixed bottom sheet is always fully reachable regardless of where the button is. */}
+                          <div className="fixed inset-0 z-40 bg-gray-900/40 sm:hidden" onClick={() => setOpenMenuFor(null)} />
+                          <div
+                            role="menu"
+                            className="fixed inset-x-3 bottom-3 z-50 max-h-[75vh] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:z-40 sm:mt-2 sm:w-[300px] sm:max-h-none"
+                          >
+                            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 sm:hidden">
+                              <p className="truncate text-sm font-black text-gray-900">Manage {s.fullName}</p>
+                              <button
+                                type="button"
+                                onClick={() => setOpenMenuFor(null)}
+                                aria-label="Close menu"
+                                className="shrink-0 rounded-xl p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                              >
+                                <Icon name="close" className="h-5 w-5" />
+                              </button>
+                            </div>
+                          <ul className="max-h-[65vh] overflow-y-auto py-1.5 sm:max-h-[70vh]">
                             {buildMenu(s).map((entry, idx) => {
                               if (entry.separator) {
                                 return (
@@ -1941,7 +1960,8 @@ const AdminSellers = () => {
                               )
                             })}
                           </ul>
-                        </div>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>

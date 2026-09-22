@@ -398,6 +398,15 @@ export function SuperAuthProvider({ children }) {
     }
   }
 
+  // Every order for a seller under one of this super admin's own admins — the raw feed the
+  // dashboard's revenue chart buckets by day. (getAdminStats above only returns per-admin totals.)
+  const getMyNetworkOrders = () => {
+    if (!superAdmin) return EMPTY_LIST
+    const myAdminIds = new Set(admins.filter((a) => a.superAdminId === superAdmin.id && !a.removed).map((a) => a.id))
+    const sellerIds = new Set(network.sellers.filter((s) => myAdminIds.has(s.adminId) && !s.deleted).map((s) => s.id))
+    return network.orders.filter((o) => sellerIds.has(o.sellerId) && Array.isArray(o.items))
+  }
+
   const value = {
     superAdmin,
     isSuperAdminLoggedIn: !!superAdmin,
@@ -428,6 +437,7 @@ export function SuperAuthProvider({ children }) {
     getSuperAdminById,
     getAdminLoginHistory,
     getAdminStats,
+    getMyNetworkOrders,
     generatePassword: generateStrongPassword,
   }
 

@@ -221,7 +221,7 @@ const SuperAdminLayout = () => {
       </aside>
 
       <main className="flex-1 min-w-0 lg:ml-[280px]">
-        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-gray-100 px-5 lg:px-8 py-4">
+        <div className="sticky top-0 z-20 bg-white/95 border-b border-gray-100 px-5 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <button className="lg:hidden p-2 rounded-xl hover:bg-gray-100 text-gray-600" onClick={() => setSidebarOpen(true)}>

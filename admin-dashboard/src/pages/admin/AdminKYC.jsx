@@ -286,7 +286,7 @@ const AdminKYC = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 py-2">
-      <div className="sticky top-0 z-10 -mx-2 px-2 pt-2 pb-3 bg-gray-50/95 backdrop-blur-md">
+      <div className="sticky top-0 z-10 -mx-2 px-2 pt-2 pb-3 bg-gray-50">
         <div className="relative">
           <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
             <Icon name="search" className="w-7 h-7" />

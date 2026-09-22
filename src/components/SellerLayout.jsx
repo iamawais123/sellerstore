@@ -1,10 +1,19 @@
-import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import SupportChatWidget from './SupportChatWidget'
 
 const SellerLayout = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { seller, sellerReady, sellerError, logoutSeller, getSellerNotifications } = useAuth()
+  // The mobile drawer only. On desktop (lg+) the sidebar is always shown and the content always makes room for it.
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Picking a page on a phone should reveal it, not leave the drawer covering it.
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
 
   // The session and the shop arrive from Firestore, so wait for them instead of bouncing a
   // signed-in seller to the login page on every reload.
@@ -131,7 +140,15 @@ const SellerLayout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col fixed h-full z-30">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/30 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside
+        className={`w-64 bg-white border-r border-gray-200 flex flex-col fixed h-full z-40 shadow-xl lg:shadow-none transform transition-transform duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-full bg-white border-2 border-[#0a3d62]/10 flex items-center justify-center text-[#0a3d62] shadow-sm shrink-0">
@@ -143,6 +160,15 @@ const SellerLayout = () => {
               <p className="font-semibold text-gray-900 truncate">{seller.shopName}</p>
               <p className="text-sm text-gray-500 truncate">{seller.fullName}</p>
             </div>
+            <button
+              className="lg:hidden p-1.5 rounded-xl hover:bg-gray-100 text-gray-500 shrink-0"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -200,7 +226,19 @@ const SellerLayout = () => {
         </div>
       </aside>
 
-      <main className="flex-1 ml-64">
+      <main className="flex-1 min-w-0 lg:ml-64">
+        <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-gray-100 bg-white/95 px-4 py-3 lg:hidden">
+          <button
+            className="p-2 rounded-xl hover:bg-gray-100 text-gray-600 shrink-0"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <p className="min-w-0 flex-1 truncate font-semibold text-gray-900">{seller.shopName}</p>
+        </div>
         <div className="p-6 lg:p-8">
           <Outlet context={{ seller }} />
         </div>
