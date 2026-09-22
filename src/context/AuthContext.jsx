@@ -433,6 +433,18 @@ export function AuthProvider({ children }) {
 
   const getSellerActivityStats = () => {
     const completedOrders = orders.filter((order) => order.status === 'Delivered')
+    // "Revenue" / "profit" on the seller's own dashboard reads as their whole order book, not just
+    // money already paid out — every order they've been given counts except the ones that were
+    // cancelled. (Money actually credited to their balance is `shopBalance`, updated separately by
+    // the admin once an order is delivered — the admin console shows that narrower figure as
+    // "Revenue (completed)".)
+    const activeOrders = orders.filter((order) => order.status !== 'Cancelled')
+    const now = new Date()
+    const isThisMonth = (iso) => {
+      const at = new Date(iso)
+      return !Number.isNaN(at.getTime()) && at.getFullYear() === now.getFullYear() && at.getMonth() === now.getMonth()
+    }
+    const monthOrders = activeOrders.filter((order) => isThisMonth(order.createdAt))
     return {
       shopBalance: seller.balance || 0,
       guarantee: seller.guarantee || 0,
@@ -441,8 +453,10 @@ export function AuthProvider({ children }) {
       ordersTotal: orders.length,
       ordersCompleted: completedOrders.length,
       ordersCancelled: orders.filter((order) => order.status === 'Cancelled').length,
-      revenue: completedOrders.reduce((sum, order) => sum + (order.total || 0), 0),
-      profit: completedOrders.reduce((sum, order) => sum + (order.profit || 0), 0),
+      revenue: activeOrders.reduce((sum, order) => sum + (order.total || 0), 0),
+      profit: activeOrders.reduce((sum, order) => sum + (order.profit || 0), 0),
+      monthRevenue: monthOrders.reduce((sum, order) => sum + (order.total || 0), 0),
+      monthProfit: monthOrders.reduce((sum, order) => sum + (order.profit || 0), 0),
       withdrawn: withdrawals.filter((w) => w.status === 'Completed').reduce((sum, w) => sum + (w.amount || 0), 0),
       pendingWithdrawals: withdrawals.filter((w) => w.status === 'Pending').length,
     }

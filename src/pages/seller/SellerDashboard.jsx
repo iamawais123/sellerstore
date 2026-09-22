@@ -54,10 +54,10 @@ const SellerDashboard = () => {
     pending: sellerOrders.filter((order) => !['Delivered', 'Cancelled'].includes(order.status)).length,
     delivered: sellerOrders.filter((order) => order.status === 'Delivered').length,
     products: slots.used,
-    thisMonthProfit: activity.profit,
+    thisMonthProfit: activity.monthProfit,
     margin: activity.revenue ? Math.round((activity.profit / activity.revenue) * 100) : 0,
     totalCost: activity.revenue - activity.profit,
-    thisMonthRevenue: activity.revenue,
+    thisMonthRevenue: activity.monthRevenue,
     avgOrderValue: activity.ordersTotal ? activity.revenue / activity.ordersTotal : 0,
   }
 
@@ -173,7 +173,7 @@ const SellerDashboard = () => {
     },
     {
       label: 'This Month',
-      value: `$${stats.thisMonthProfit.toFixed(2)}`,
+      value: `$${stats.thisMonthRevenue.toFixed(2)}`,
       subValue: `Profit $${stats.thisMonthProfit.toFixed(2)}`,
       bgColor: 'bg-orange-50/60',
       borderColor: 'border-orange-100',
