@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { safeRedirect } from '../../data/redirect'
 import { useAuth } from '../../context/AuthContext'
 
 const CustomerSignup = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirect = safeRedirect(searchParams.get('redirect'))
+  const otherLink = redirect === '/' ? '/login' : `/login?redirect=${encodeURIComponent(redirect)}`
   const { signUpCustomer } = useAuth()
   const [form, setForm] = useState({
     fullName: '',
@@ -59,7 +63,7 @@ const CustomerSignup = () => {
     setSubmitting(true)
     const result = await signUpCustomer({ fullName: form.fullName, email: form.email, password: form.password })
     setSubmitting(false)
-    if (result.success) navigate('/')
+    if (result.success) navigate(redirect, { replace: true })
     else setError(result.error)
   }
 
@@ -277,7 +281,7 @@ const CustomerSignup = () => {
               <p className="text-gray-500">
                 Already have an account?{' '}
                 <Link
-                  to="/login"
+                  to={otherLink}
                   className="font-semibold text-slate-900 hover:text-[#4c1d95] transition-colors"
                 >
                   Sign in

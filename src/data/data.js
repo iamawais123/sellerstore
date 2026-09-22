@@ -1,17 +1,19 @@
 import { generateReviews } from './reviews'
+import { importedProducts } from './importedProducts'
 
 const ASSETS_BASE = '/assets/U Seller Store — Shop Premium Products-images'
 
 export const ASSETS = ASSETS_BASE
 
+// Same order as the live store's Categories page.
 export const categories = [
   { id: 1, name: 'All', image: '', bgColor: '' },
-  { id: 2, name: 'Under Garments', image: `${ASSETS_BASE}/under-garments.jpg`, bgColor: 'bg-pink-100' },
   { id: 3, name: 'Clothes', image: `${ASSETS_BASE}/clothes.jpg`, bgColor: 'bg-amber-100' },
   { id: 4, name: 'Women Clothes', image: `${ASSETS_BASE}/women-clothes.jpg`, bgColor: 'bg-amber-50' },
   { id: 5, name: 'Remotes', image: `${ASSETS_BASE}/remotes.jpg`, bgColor: 'bg-gray-50' },
-  { id: 6, name: 'Women Accessories', image: `${ASSETS_BASE}/women-accessories.jpg`, bgColor: 'bg-amber-50' },
+  { id: 2, name: 'Under Garments', image: `${ASSETS_BASE}/under-garments.jpg`, bgColor: 'bg-pink-100' },
   { id: 7, name: 'Bags', image: `${ASSETS_BASE}/bags.jpg`, bgColor: 'bg-amber-100' },
+  { id: 6, name: 'Women Accessories', image: `${ASSETS_BASE}/women-accessories.jpg`, bgColor: 'bg-amber-50' },
   { id: 8, name: 'Electronics', image: `${ASSETS_BASE}/electronics.jpg`, bgColor: 'bg-gray-200' },
   { id: 9, name: 'Laptops', image: `${ASSETS_BASE}/laptops-cover.png`, bgColor: 'bg-gray-100' },
   { id: 10, name: 'Tablets', image: `${ASSETS_BASE}/tablets-cover.png`, bgColor: 'bg-white' },
@@ -24,17 +26,17 @@ export const categories = [
   { id: 17, name: 'Sports & Outdoors', image: `${ASSETS_BASE}/sports-outdoors.jpg`, bgColor: 'bg-white' },
   { id: 18, name: 'Toys & Games', image: `${ASSETS_BASE}/toys-games.jpg`, bgColor: 'bg-amber-50' },
   { id: 19, name: 'Books', image: `${ASSETS_BASE}/books.jpg`, bgColor: 'bg-amber-100' },
-  { id: 20, name: 'Health & Wellness', image: '', bgColor: '' },
-  { id: 21, name: 'Office Supplies', image: '', bgColor: '' },
+  { id: 20, name: 'Health & Wellness', image: `${ASSETS_BASE}/health-wellness.jpg`, bgColor: 'bg-emerald-50' },
+  { id: 21, name: 'Office Supplies', image: `${ASSETS_BASE}/office-supplies.jpg`, bgColor: 'bg-gray-100' },
 ]
 
 export const heroSlides = [
-  { id: 1, category: 'FASHION & ACCESSORIES', title: 'Style, perfectly curated', cta: 'Shop the look', image: `${ASSETS_BASE}/banner-1-D1oObzR8.jpg` },
-  { id: 2, category: 'ELECTRONICS', title: 'Tech that elevates', cta: 'Shop now', image: `${ASSETS_BASE}/banner-2-BtfDPfsY.jpg` },
-  { id: 3, category: 'HOME & KITCHEN', title: 'Home essentials, redefined', cta: 'Explore', image: `${ASSETS_BASE}/banner-3-bKMq95Dw.jpg` },
-  { id: 4, category: 'BEAUTY', title: 'Glow from head to toe', cta: 'Discover', image: `${ASSETS_BASE}/banner-4-i-uwyAJB.jpg` },
-  { id: 5, category: 'SPORTS', title: 'Gear up for adventure', cta: 'Shop sports', image: `${ASSETS_BASE}/banner-5-DbeJ73Rw.jpg` },
-  { id: 6, category: 'DEALS', title: 'Unbeatable prices inside', cta: 'See deals', image: `${ASSETS_BASE}/banner-6-2PSYZuiH.jpg` },
+  { id: 1, category: 'FASHION & ACCESSORIES', title: 'Style, perfectly curated', cta: 'Shop the look', to: '/shop?category=Fashion', image: `${ASSETS_BASE}/banner-1-D1oObzR8.jpg` },
+  { id: 2, category: 'ELECTRONICS', title: 'Tech that elevates', cta: 'Shop now', to: '/shop?category=Electronics', image: `${ASSETS_BASE}/banner-2-BtfDPfsY.jpg` },
+  { id: 3, category: 'HOME & KITCHEN', title: 'Home essentials, redefined', cta: 'Explore', to: '/shop?category=Home%20%26%20Kitchen', image: `${ASSETS_BASE}/banner-3-bKMq95Dw.jpg` },
+  { id: 4, category: 'BEAUTY', title: 'Glow from head to toe', cta: 'Discover', to: '/shop?category=Beauty%20%26%20Personal%20Care', image: `${ASSETS_BASE}/banner-4-i-uwyAJB.jpg` },
+  { id: 5, category: 'SPORTS', title: 'Gear up for adventure', cta: 'Shop sports', to: '/shop?category=Sports%20%26%20Outdoors', image: `${ASSETS_BASE}/banner-5-DbeJ73Rw.jpg` },
+  { id: 6, category: 'DEALS', title: 'Unbeatable prices inside', cta: 'See deals', to: '/shop?sort=price-low', image: `${ASSETS_BASE}/banner-6-2PSYZuiH.jpg` },
 ]
 
 const S = (label, value) => ({ label, value })
@@ -143,6 +145,8 @@ const mapCategory = (id) => {
   return m[id] || 'General'
 }
 
+const normalizeName = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
 const buildAllProducts = () => {
   const rawList = [
     { id: 1, name: 'Cucumber Trellis for Raised Bed', price: 22.94, oldPrice: 26.99, discount: 15, rating: 4.8, reviewCount: 296, image: `${ASSETS_BASE}/61-f6JORKlL._AC_SL400_.jpg` },
@@ -179,11 +183,10 @@ const buildAllProducts = () => {
     { id: 32, name: 'Omega Seamaster Diver Automatic 300M Watch', price: 5320.00, oldPrice: null, discount: null, rating: 4.7, reviewCount: 26, image: `${ASSETS_BASE}/61A4DjEFGqL._AC_SL400_.jpg` },
     { id: 33, name: 'Omega Seamaster Diver Chronometer Co-Axial', price: 10500.00, oldPrice: null, discount: null, rating: 5.0, reviewCount: 48, image: `${ASSETS_BASE}/61A4DjEFGqL._AC_SL400_.jpg` },
     { id: 34, name: 'Omega Men\'s Speedmaster Professional Moonwatch', price: 4720.00, oldPrice: null, discount: null, rating: 4.8, reviewCount: 23, image: `${ASSETS_BASE}/61A4DjEFGqL._AC_SL400_.jpg` },
-    { id: 35, name: 'Apple 16-Inch MacBook Pro Laptop Early 2024 M3 Max', price: 8230.00, oldPrice: null, discount: null, rating: 4.9, reviewCount: 45, image: `${ASSETS_BASE}/laptops-cover.png` },
     { id: 36, name: 'Samsung 85 Inch Neo QLED 8K Smart TV', price: 6469.00, oldPrice: 7520.00, discount: 14, rating: 4.8, reviewCount: 88, image: `${ASSETS_BASE}/electronics.jpg` },
   ]
 
-  return rawList.map(p => {
+  const generated = rawList.map(p => {
     const cat = mapCategory(p.id)
     const realReviewCount = Math.max(55, p.reviewCount + Math.floor(Math.random() * 160))
     return {
@@ -200,19 +203,56 @@ const buildAllProducts = () => {
       breadcrumb: ['Home', 'Shop', cat]
     }
   })
+
+  // importedProducts.js holds the categories copied from the live store as-is (prices, counts,
+  // descriptions, reviews), so they skip the generated reviews/features above. Their gallery,
+  // description sections and reviews load on demand per product (see loadStoredProductData).
+  const imported = importedProducts.map(p => ({ ...p, wishlist: false, breadcrumb: ['Home', 'Shop', p.category], reviews: [], hasStoredData: true }))
+
+  // A few of the original products are the same listings that now arrive from the live catalogue.
+  // The live version takes over: it keeps the original's slot on the home page and the shop
+  // shows it once instead of twice.
+  const importedKeys = imported.map(p => [normalizeName(p.name), p])
+  const twinOf = (p) => {
+    const key = normalizeName(p.name)
+    if (key.length < 20) return null
+    const matches = importedKeys
+      .filter(([other]) => other.startsWith(key) || key.startsWith(other))
+      .map(([, imp]) => imp)
+    return matches.find(imp => imp.price === p.price) ?? matches[0] ?? null
+  }
+  const twins = new Map(generated.map(p => [String(p.id), twinOf(p)]))
+
+  return {
+    all: [...generated.filter(p => !twins.get(String(p.id))), ...imported],
+    home: generated.map(p => twins.get(String(p.id)) ?? p),
+    replacedBy: new Map([...twins].filter(([, twin]) => twin)),
+  }
 }
 
-export const allProducts = buildAllProducts()
+// Per-product gallery, description sections and reviews for imported products live in
+// public/imported-data/<id>.json (plain static files, fetched when a product page opens).
+const emptyStoredData = { gallery: null, detailSections: [], reviews: [] }
+
+export const loadStoredProductData = (product) =>
+  fetch(`${import.meta.env.BASE_URL}imported-data/${product.id}.json`)
+    .then(res => (res.ok ? res.json() : emptyStoredData))
+    .catch(() => emptyStoredData)
+
+const built = buildAllProducts()
+
+export const allProducts = built.all
 
 const flat = allProducts
 
 export const products = {
-  editorsPicks: flat.slice(0, 10),
-  trending: flat.slice(10, 20),
-  bestSellers: flat.slice(20, 30),
+  editorsPicks: built.home.slice(0, 10),
+  trending: built.home.slice(10, 20),
+  bestSellers: built.home.slice(20, 30),
 }
 
-export const findProductById = (id) => flat.find(p => String(p.id) === String(id))
+// Old ids of the replaced originals still resolve, to their live version.
+export const findProductById = (id) => flat.find(p => String(p.id) === String(id)) ?? built.replacedBy.get(String(id))
 export const findProductBySlug = (slug) => flat.find(p => p.slug === slug)
 export const getRelatedProducts = (product, count = 5) => {
   const sameCat = flat.filter(p => String(p.id) !== String(product.id) && p.category === product.category)

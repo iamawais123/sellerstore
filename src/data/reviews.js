@@ -110,6 +110,17 @@ const avatarInitialBg = [
   'bg-indigo-500', 'bg-lime-500', 'bg-fuchsia-500', 'bg-cyan-500'
 ]
 
+// Reviewer avatar helpers. Imported reviews store only the name; the picture, initials and colour
+// are derived from it so they stay identical to the live store (which seeds avatars by lowercase name).
+export const reviewerInitials = (name = '') =>
+  name.trim().split(/\s+/).map(part => part[0]).slice(0, 2).join('').toUpperCase() || '?'
+
+export const reviewerAvatarUrl = (name = '') =>
+  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name.toLowerCase())}&radius=50`
+
+export const reviewerBg = (name = '') =>
+  avatarInitialBg[[...name].reduce((sum, ch) => (sum * 31 + ch.charCodeAt(0)) >>> 0, 7) % avatarInitialBg.length]
+
 export const generateReviews = (count, baseRating) => {
   const reviewCount = Math.max(50, count + Math.floor(Math.random() * 180))
   const reviews = []

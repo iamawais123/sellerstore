@@ -2,11 +2,20 @@ import { Component } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
+import { WishlistProvider } from './context/WishlistContext'
+import ScrollToTop from './components/ScrollToTop'
 import Navbar from './components/Navbar'
 import CartDrawer from './components/CartDrawer'
 import Home from './pages/Home'
 import Shop from './pages/Shop'
 import ProductDetail from './pages/ProductDetail'
+import Categories from './pages/Categories'
+import Cart from './pages/Cart'
+import Checkout from './pages/Checkout'
+import Wishlist from './pages/Wishlist'
+import Orders from './pages/Orders'
+import Profile from './pages/Profile'
+import { Privacy, Terms, Cookies } from './pages/info/InfoPages'
 import FeaturesBar from './components/FeaturesBar'
 import Footer from './components/Footer'
 import SellerLayout from './components/SellerLayout'
@@ -86,10 +95,21 @@ const StoreLayout = ({ children }) => (
 
 function AppInner() {
   return (
+    <>
+    <ScrollToTop />
     <Routes>
       <Route path="/" element={<StoreLayout children={<Home />} />} />
       <Route path="/shop" element={<StoreLayout children={<Shop />} />} />
+      <Route path="/categories" element={<StoreLayout children={<Categories />} />} />
       <Route path="/product/:id" element={<StoreLayout children={<ProductDetail />} />} />
+      <Route path="/cart" element={<StoreLayout children={<Cart />} />} />
+      <Route path="/checkout" element={<StoreLayout children={<Checkout />} />} />
+      <Route path="/wishlist" element={<StoreLayout children={<Wishlist />} />} />
+      <Route path="/orders" element={<StoreLayout children={<Orders />} />} />
+      <Route path="/profile" element={<StoreLayout children={<Profile />} />} />
+      <Route path="/privacy" element={<StoreLayout children={<Privacy />} />} />
+      <Route path="/terms" element={<StoreLayout children={<Terms />} />} />
+      <Route path="/cookies" element={<StoreLayout children={<Cookies />} />} />
 
       <Route path="/login" element={<CustomerLogin />} />
       <Route path="/signup" element={<CustomerSignup />} />
@@ -109,6 +129,7 @@ function AppInner() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   )
 }
 
@@ -117,9 +138,11 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <CartProvider>
-          <BrowserRouter>
-            <AppInner />
-          </BrowserRouter>
+          <WishlistProvider>
+            <BrowserRouter>
+              <AppInner />
+            </BrowserRouter>
+          </WishlistProvider>
         </CartProvider>
       </AuthProvider>
     </ErrorBoundary>

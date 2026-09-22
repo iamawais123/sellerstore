@@ -8,9 +8,9 @@ const Home = () => {
     <div>
       <Hero />
       <Categories categories={categories.filter(c => c.id > 1)} />
-      <ProductSection title="Editor's Picks" products={products.editorsPicks} />
-      <ProductSection title="Trending Now" products={products.trending} />
-      <ProductSection title="Best Sellers" products={products.bestSellers} />
+      <ProductSection title="Editor's Picks" products={products.editorsPicks} to="/shop" />
+      <ProductSection title="Trending Now" products={products.trending} to="/shop?sort=reviews" />
+      <ProductSection title="Best Sellers" products={products.bestSellers} to="/shop?sort=rating" />
     </div>
   )
 }

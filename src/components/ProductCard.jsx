@@ -1,19 +1,25 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatPrice, shortTitle } from '../data/format'
+import { useCart } from '../context/CartContext'
+import { useWishlist } from '../context/WishlistContext'
 
 const ProductCard = ({ product }) => {
-  const [wishlisted, setWishlisted] = useState(product.wishlist || false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const { addItem } = useCart()
+  const { has, toggle } = useWishlist()
+  const wishlisted = has(product.id)
 
   const toggleWishlist = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    setWishlisted(!wishlisted)
+    toggle(product.id)
   }
 
   const handleAddToCart = (e) => {
     e.preventDefault()
     e.stopPropagation()
+    addItem(product, 1)
   }
 
   const reviewCount = product.reviewCount ?? (Array.isArray(product.reviews) ? product.reviews.length : 0)
@@ -37,7 +43,8 @@ const ProductCard = ({ product }) => {
               ? 'bg-rose-500 text-white'
               : 'bg-white text-gray-600 hover:bg-rose-50 hover:text-rose-500'
           }`}
-          aria-label="Add to wishlist"
+          aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+          aria-pressed={wishlisted}
         >
           <svg
             className="w-4 h-4"
@@ -71,8 +78,8 @@ const ProductCard = ({ product }) => {
       </div>
 
       <div className="flex-1 flex flex-col p-4">
-        <h3 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2 min-h-[40px] group-hover:text-[#0a3d62] transition-colors mb-3">
-          {product.name}
+        <h3 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2 min-h-[40px] group-hover:text-[#0a3d62] transition-colors mb-3" title={product.name}>
+          {shortTitle(product.name, 60)}
         </h3>
 
         <div className="flex items-center space-x-1 mb-3">
@@ -82,25 +89,25 @@ const ProductCard = ({ product }) => {
             </svg>
           </div>
           <span className="text-sm font-medium text-gray-900">
-            {product.rating}
+            {Number(product.rating).toFixed(1)}
           </span>
           <span className="text-sm text-gray-400">({reviewCount})</span>
         </div>
 
-        <div className="mt-auto flex items-end justify-between pt-2">
-          <div className="flex items-baseline space-x-2">
-            <span className="text-xl font-bold text-gray-900">
-              ${product.price.toFixed(2)}
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-2">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+            <span className="text-lg font-bold text-gray-900 whitespace-nowrap">
+              {formatPrice(product.price)}
             </span>
             {product.oldPrice && (
               <span className="text-sm text-gray-400 line-through">
-                ${product.oldPrice.toFixed(2)}
+                {formatPrice(product.oldPrice)}
               </span>
             )}
           </div>
           <button
             onClick={handleAddToCart}
-            className="w-11 h-11 rounded-full bg-[#0a3d62] hover:bg-[#0f4c81] text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-300 shrink-0 group/btn"
+            className="ml-auto w-10 h-10 rounded-full bg-[#0a3d62] hover:bg-[#0f4c81] text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-300 shrink-0 group/btn"
             aria-label="Add to cart"
           >
             <svg

@@ -1,8 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import ProductCard from '../components/ProductCard'
-import { findProductById, getRelatedProducts } from '../data/data'
+import { categories, findProductById, getRelatedProducts, loadStoredProductData } from '../data/data'
+import { reviewerAvatarUrl, reviewerBg, reviewerInitials } from '../data/reviews'
+import { formatPrice, shortTitle } from '../data/format'
 import { useCart } from '../context/CartContext'
+import { useWishlist } from '../context/WishlistContext'
+import { useAuth } from '../context/AuthContext'
 
 const renderStars = (rating, size = 'w-5 h-5') => (
   <div className="flex items-center">
@@ -18,22 +22,146 @@ const renderStars = (rating, size = 'w-5 h-5') => (
   </div>
 )
 
+const Chevron = ({ up }) => (
+  <svg className={`w-4 h-4 transition-transform ${up ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
+)
+
 const REVIEWS_PER_LOAD = 5
+const TITLE_LIMIT = 70
+const DETAILS_COLLAPSED_HEIGHT = 160
+const BULLETS_COLLAPSED = 3
+
+const ReadToggle = ({ open, onClick, moreLabel = 'Read more', className = '' }) => (
+  <button onClick={onClick} className={`inline-flex items-center space-x-1 text-[#0a3d62] font-semibold hover:underline ${className}`}>
+    <span>{open ? 'Read less' : moreLabel}</span>
+    <Chevron up={open} />
+  </button>
+)
+
+const DetailBullets = ({ items }) => {
+  const [open, setOpen] = useState(false)
+  const collapsible = items.length > BULLETS_COLLAPSED
+  const shown = open || !collapsible ? items : items.slice(0, BULLETS_COLLAPSED)
+  return (
+    <div>
+      <ul className="space-y-1.5 text-sm text-gray-700 list-disc pl-5 marker:text-[#0a3d62]">
+        {shown.map((text, i) => <li key={i} className="leading-relaxed">{text}</li>)}
+      </ul>
+      {collapsible && (
+        <ReadToggle
+          open={open}
+          onClick={() => setOpen(o => !o)}
+          moreLabel={`Read more (${items.length - BULLETS_COLLAPSED} more)`}
+          className="mt-3 text-sm"
+        />
+      )}
+    </div>
+  )
+}
+
+const SpecRows = ({ items }) => (
+  <ul className="space-y-3">
+    {items.map((s, i) => (
+      <li key={i} className="flex items-stretch p-4 bg-gray-50 rounded-xl">
+        <span className="w-2/5 shrink-0 text-sm font-semibold text-gray-600 pr-3">{s.label}</span>
+        <span className="w-3/5 text-sm text-gray-900 font-medium break-words">{s.value}</span>
+      </li>
+    ))}
+  </ul>
+)
+
+const DetailBlock = ({ block }) => {
+  if (block.kind === 'prose') {
+    return <p className="text-sm text-gray-500 leading-relaxed whitespace-pre-line">{block.text}</p>
+  }
+  if (block.kind === 'bullets') return <DetailBullets items={block.items} />
+  return <SpecRows items={block.items} />
+}
+
+// Description sections imported from the live store: an optional Overview, then titled cards
+// (Features, Specifications, ...) of prose, bullets and spec rows. Collapsed until "Read more".
+const DetailSections = ({ sections }) => {
+  const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+  const boxRef = useRef(null)
+
+  useEffect(() => {
+    setExpanded(false)
+    if (boxRef.current) setOverflowing(boxRef.current.scrollHeight > DETAILS_COLLAPSED_HEIGHT + 20)
+  }, [sections])
+
+  if (!sections.length) return <p className="text-sm text-gray-500">No description available.</p>
+
+  const hasOverview = sections[0].title.toLowerCase() === 'overview'
+  const overview = hasOverview ? sections[0] : null
+  const rest = hasOverview ? sections.slice(1) : sections
+  const collapsed = overflowing && !expanded
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <div
+          ref={boxRef}
+          className="space-y-6"
+          style={collapsed ? { maxHeight: DETAILS_COLLAPSED_HEIGHT, overflow: 'hidden' } : undefined}
+        >
+          {overview && (
+            <div className="space-y-3">
+              {overview.blocks.map((b, i) => <DetailBlock key={i} block={b} />)}
+            </div>
+          )}
+          {rest.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+              {rest.map((section, i) => (
+                <div key={i} className="border border-gray-100 rounded-2xl p-5 sm:p-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">{section.title}</h3>
+                  <div className="space-y-3">
+                    {section.blocks.map((b, j) => <DetailBlock key={j} block={b} />)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {collapsed && (
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent" />
+        )}
+      </div>
+      {overflowing && <ReadToggle open={expanded} onClick={() => setExpanded(e => !e)} />}
+    </div>
+  )
+}
 
 const ProductDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const product = findProductById(id)
-  const { addItem, openCart } = useCart()
+  const { addItem, closeCart } = useCart()
+  const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
+  const { isCustomerLoggedIn } = useAuth()
 
   const [activeImage, setActiveImage] = useState(0)
   const [qty, setQty] = useState(1)
-  const [wishlisted, setWishlisted] = useState(false)
   const [showFullFeatures, setShowFullFeatures] = useState(false)
   const [showFullTitle, setShowFullTitle] = useState(false)
   const [visibleReviews, setVisibleReviews] = useState(REVIEWS_PER_LOAD)
 
   const relatedProducts = useMemo(() => (product ? getRelatedProducts(product, 5) : []), [product?.id])
+
+  const [stored, setStored] = useState(null)
+  useEffect(() => {
+    let alive = true
+    setStored(null)
+    setActiveImage(0)
+    setShowFullTitle(false)
+    setVisibleReviews(REVIEWS_PER_LOAD)
+    if (product?.hasStoredData) {
+      loadStoredProductData(product).then(data => { if (alive) setStored(data) })
+    }
+    return () => { alive = false }
+  }, [product?.id])
 
   if (!product) {
     return (
@@ -47,13 +175,23 @@ const ProductDetail = () => {
     )
   }
 
-  const bc = product.breadcrumb || ['Home', 'Shop', product.category]
-  const reviews = product.reviews || []
+  const gallery = stored?.gallery ?? product.gallery ?? [product.image]
+  const reviews = stored?.reviews ?? product.reviews ?? []
   const totalReviews = product.reviewCount || reviews.length
   const reviewSubset = reviews.slice(0, visibleReviews)
   const hasMore = visibleReviews < reviews.length
+  const wishlisted = inWishlist(product.id)
+  const categoryLinkable = categories.some(c => c.name === product.category)
+  const shortName = shortTitle(product.name, TITLE_LIMIT)
+  const titleTooLong = shortName !== product.name.replace(/\s+/g, ' ').trim()
 
   const visibleFeatures = showFullFeatures ? product.features : product.features?.slice(0, 2) || []
+
+  const onBuyNow = () => {
+    addItem(product, qty)
+    closeCart()
+    navigate(isCustomerLoggedIn ? '/checkout' : '/login?redirect=/checkout')
+  }
 
   const onShare = () => {
     if (navigator.share) {
@@ -66,80 +204,51 @@ const ProductDetail = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
       <nav className="flex items-center flex-wrap gap-x-2 gap-y-1 text-sm text-gray-500 mb-6">
-        {bc.map((crumb, i) => {
-          const isLast = i === bc.length - 1
-          const path = i === 0 ? '/' : i === 1 ? '/shop' : null
-          const Label = (
-            <span className={`${isLast ? 'text-gray-900 font-medium' : 'hover:text-[#0a3d62] hover:underline'}`}>
-              {i === 0 ? (
-                <span className="inline-flex items-center space-x-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                  <span>{crumb}</span>
-                </span>
-              ) : isLast ? (
-                <span className="line-clamp-1">{product.name}</span>
-              ) : (
-                crumb
-              )}
-            </span>
-          )
-          return (
-            <span key={i} className="inline-flex items-center space-x-2">
-              {path ? <Link to={path}>{Label}</Link> : Label}
-              {!isLast && <span className="text-gray-300">›</span>}
-            </span>
-          )
-        })}
+        <Link to="/" className="inline-flex items-center space-x-1 hover:text-[#0a3d62] hover:underline">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          <span>Home</span>
+        </Link>
+        <span className="text-gray-300">›</span>
+        <Link to="/shop" className="hover:text-[#0a3d62] hover:underline">Shop</Link>
+        <span className="text-gray-300">›</span>
+        {categoryLinkable ? (
+          <Link to={`/shop?category=${encodeURIComponent(product.category)}`} className="hover:text-[#0a3d62] hover:underline">
+            {product.category}
+          </Link>
+        ) : (
+          <span>{product.category}</span>
+        )}
+        <span className="text-gray-300">›</span>
+        <span className="text-gray-900 font-medium line-clamp-1" title={product.name}>{shortName}</span>
       </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-16">
-        <div className="space-y-4">
-          <div className="relative aspect-square rounded-3xl overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-8 lg:gap-12 mb-14">
+        <div>
+          <div className="relative aspect-square rounded-3xl overflow-hidden border border-gray-100 bg-white flex items-center justify-center p-6">
             {product.discount && (
               <span className="absolute top-4 left-4 z-10 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
                 -{product.discount}%
               </span>
             )}
             <img
-              src={product.gallery?.[activeImage] || product.image}
+              src={gallery[activeImage] || product.image}
               alt={product.name}
               className="w-full h-full object-contain"
             />
           </div>
-
-          <div className="flex items-center space-x-3 overflow-x-auto hide-scrollbar pb-1">
-            <p className="text-sm font-semibold text-gray-500 shrink-0 mr-2">MORE VIEWS</p>
-            {(product.gallery || [product.image]).map((img, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveImage(i)}
-                className={`shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-2 transition-all ${
-                  i === activeImage
-                    ? 'border-[#0a3d62] shadow-md'
-                    : 'border-gray-100 hover:border-gray-300'
-                }`}
-              >
-                <img src={img} alt={`View ${i + 1}`} className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
         </div>
 
-        <div className="flex flex-col">
-          <div className="flex items-start justify-between space-x-4 mb-4">
-            <div className="flex-1">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 leading-tight">
-                {showFullTitle ? product.name : (
-                  <>
-                    {product.name.length > 80 ? product.name.slice(0, 77) + '...' : product.name}
-                  </>
-                )}
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight break-words">
+                {showFullTitle || !titleTooLong ? product.name : shortName}
               </h1>
-              {product.name.length > 80 && (
-                <button onClick={() => setShowFullTitle(true)} className="mt-2 text-[#0a3d62] font-semibold text-sm hover:underline">
-                  Show full title
+              {titleTooLong && (
+                <button onClick={() => setShowFullTitle(v => !v)} className="mt-2 text-[#0a3d62] font-semibold text-sm hover:underline">
+                  {showFullTitle ? 'Show less' : 'Show full title'}
                 </button>
               )}
             </div>
@@ -156,7 +265,7 @@ const ProductDetail = () => {
 
           <div className="flex items-center space-x-3 mb-4">
             {renderStars(product.rating, 'w-5 h-5')}
-            <span className="text-lg font-bold text-gray-900">{product.rating}</span>
+            <span className="text-lg font-bold text-gray-900">{Number(product.rating).toFixed(1)}</span>
             <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="text-gray-500 hover:text-gray-900 hover:underline">
               ({totalReviews} reviews)
             </button>
@@ -164,12 +273,12 @@ const ProductDetail = () => {
 
           <div className="flex items-baseline flex-wrap gap-x-3 gap-y-2 mb-5">
             <span className="text-4xl font-extrabold text-[#0a3d62]">
-              ${product.price.toFixed(2)}
+              {formatPrice(product.price)}
             </span>
             {product.oldPrice && (
               <>
                 <span className="text-xl text-gray-400 line-through">
-                  ${product.oldPrice.toFixed(2)}
+                  {formatPrice(product.oldPrice)}
                 </span>
                 <span className="bg-amber-500 text-white text-sm font-bold px-3 py-1 rounded-full">
                   -{product.discount}%
@@ -219,11 +328,12 @@ const ProductDetail = () => {
               <span>Add to Cart</span>
             </button>
             <button
-              onClick={() => setWishlisted(w => !w)}
+              onClick={() => toggleWishlist(product.id)}
+              aria-pressed={wishlisted}
               className={`w-14 h-14 shrink-0 rounded-xl border border-gray-200 flex items-center justify-center transition-colors ${
                 wishlisted ? 'bg-rose-50 text-rose-500 border-rose-200' : 'text-gray-500 hover:bg-gray-50'
               }`}
-              aria-label="Add to wishlist"
+              aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
             >
               <svg className="w-6 h-6" fill={wishlisted ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -232,63 +342,83 @@ const ProductDetail = () => {
           </div>
 
           <button
-            onClick={() => navigate('/shop')}
-            className="w-full px-8 py-3.5 border border-gray-200 rounded-xl text-gray-900 font-semibold hover:bg-gray-50 transition-colors mb-8"
+            onClick={onBuyNow}
+            disabled={!product.inStock}
+            className="w-full px-8 py-3.5 border border-gray-200 rounded-xl text-gray-900 font-semibold hover:bg-gray-50 transition-colors mb-6 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Buy Now
           </button>
 
-          <div className="border-t border-gray-100 pt-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Product Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="border border-gray-100 rounded-2xl p-5 sm:p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Features</h3>
-                <ul className="space-y-3">
-                  {visibleFeatures.map((f, i) => (
-                    <li key={i} className="p-4 bg-gray-50 rounded-xl">
-                      <p className="font-semibold text-gray-900 text-[15px] mb-1">{f.title}</p>
-                      <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
-                    </li>
-                  ))}
-                </ul>
-                {product.features?.length > 2 && (
+          {gallery.length > 1 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-500 mb-3">MORE VIEWS</p>
+              <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar pb-1">
+                {gallery.map((img, i) => (
                   <button
-                    onClick={() => setShowFullFeatures(v => !v)}
-                    className="mt-4 inline-flex items-center space-x-1 text-[#0a3d62] font-semibold hover:underline"
+                    key={i}
+                    onClick={() => setActiveImage(i)}
+                    className={`shrink-0 w-24 h-24 sm:w-[104px] sm:h-[104px] rounded-2xl overflow-hidden border-2 bg-white p-1 transition-all ${
+                      i === activeImage
+                        ? 'border-[#0a3d62] shadow-md'
+                        : 'border-gray-100 hover:border-gray-300'
+                    }`}
                   >
-                    <span>{showFullFeatures ? 'Read less' : 'Read more'}</span>
-                    <svg className={`w-4 h-4 transition-transform ${showFullFeatures ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <img src={img} alt={`View ${i + 1}`} loading="lazy" className="w-full h-full object-contain" />
                   </button>
-                )}
-              </div>
-
-              <div className="border border-gray-100 rounded-2xl p-5 sm:p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Specifications</h3>
-                <ul className="space-y-3">
-                  {(product.specifications || []).map((s, i) => (
-                    <li key={i} className="flex items-stretch p-4 bg-gray-50 rounded-xl">
-                      <span className="w-2/5 shrink-0 text-sm font-semibold text-gray-600 pr-3">{s.label}</span>
-                      <span className="w-3/5 text-sm text-gray-900 font-medium">{s.value}</span>
-                    </li>
-                  ))}
-                </ul>
+                ))}
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
+
+      <section className="mb-14">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Product Details</h2>
+        {product.hasStoredData ? (
+          stored
+            ? <DetailSections sections={stored.detailSections} />
+            : <p className="text-sm text-gray-500">Loading details…</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+            <div className="border border-gray-100 rounded-2xl p-5 sm:p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Features</h3>
+              <ul className="space-y-3">
+                {visibleFeatures.map((f, i) => (
+                  <li key={i} className="p-4 bg-gray-50 rounded-xl">
+                    <p className="font-semibold text-gray-900 text-[15px] mb-1">{f.title}</p>
+                    <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+                  </li>
+                ))}
+              </ul>
+              {product.features?.length > 2 && (
+                <ReadToggle open={showFullFeatures} onClick={() => setShowFullFeatures(v => !v)} className="mt-4" />
+              )}
+            </div>
+
+            <div className="border border-gray-100 rounded-2xl p-5 sm:p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Specifications</h3>
+              <SpecRows items={product.specifications || []} />
+            </div>
+          </div>
+        )}
+      </section>
 
       <section id="reviews" className="mb-16 scroll-mt-28">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Customer Reviews</h2>
         <div className="space-y-4">
-          {reviewSubset.map(r => (
-            <div key={r.id} className="border border-gray-100 rounded-2xl p-5 sm:p-6 hover:border-gray-200 transition-colors">
+          {reviewSubset.map((r, i) => (
+            <div key={r.id ?? i} className="border border-gray-100 rounded-2xl p-5 sm:p-6 hover:border-gray-200 transition-colors">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center space-x-3">
-                  <div className={`w-11 h-11 rounded-full ${r.avatarBg} text-white font-bold flex items-center justify-center`}>
-                    {r.initials}
+                  <div className={`relative w-11 h-11 shrink-0 rounded-full ${r.avatarBg ?? reviewerBg(r.name)} text-white font-bold flex items-center justify-center overflow-hidden`}>
+                    {r.initials ?? reviewerInitials(r.name)}
+                    <img
+                      src={r.avatarUrl ?? reviewerAvatarUrl(r.name)}
+                      alt=""
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover bg-white"
+                      onError={e => { e.currentTarget.style.display = 'none' }}
+                    />
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">

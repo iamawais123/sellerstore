@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
+import { formatPrice } from '../data/format'
 
 const CartIconEmpty = () => (
   <svg className="w-20 h-20 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -38,6 +39,13 @@ const CartDrawer = () => {
   const { isCustomerLoggedIn } = useAuth()
 
   useEffect(() => {
+    if (!isOpen) return undefined
+    const onKey = (e) => e.key === 'Escape' && closeCart()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, closeCart])
+
+  useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
     } else {
@@ -49,10 +57,13 @@ const CartDrawer = () => {
   }, [isOpen])
 
   const onCheckout = () => {
-    if (!isCustomerLoggedIn) {
-      closeCart()
-      navigate('/login')
-    }
+    closeCart()
+    navigate(isCustomerLoggedIn ? '/checkout' : '/login?redirect=/checkout')
+  }
+
+  const onViewCart = () => {
+    closeCart()
+    navigate('/cart')
   }
 
   const onBrowseProducts = () => {
@@ -127,7 +138,7 @@ const CartDrawer = () => {
                       {item.name}
                     </p>
                     <p className="text-sm font-bold text-gray-900 mb-2.5">
-                      ${(Number(item.price) || 0).toFixed(2)}
+                      {formatPrice(item.price)}
                     </p>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
@@ -172,7 +183,7 @@ const CartDrawer = () => {
           <footer className="border-t border-gray-100 px-5 sm:px-7 py-5 space-y-3 bg-white">
             <div className="flex items-center justify-between text-gray-700">
               <span className="text-base font-semibold">Subtotal</span>
-              <span className="text-lg font-bold text-gray-900">${subtotal.toFixed(2)}</span>
+              <span className="text-lg font-bold text-gray-900">{formatPrice(subtotal)}</span>
             </div>
 
             <button
@@ -185,7 +196,7 @@ const CartDrawer = () => {
 
             <button
               type="button"
-              onClick={onBrowseProducts}
+              onClick={onViewCart}
               className="w-full py-3.5 bg-white border border-gray-200 text-gray-900 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
             >
               View Full Cart
