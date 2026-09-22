@@ -1,6 +1,16 @@
 // Master catalog of products every verified seller can pick from to stock their shop.
 // Each entry carries the wholesale cost (what the seller pays U Seller Store) and the
 // suggested retail sell price shown to the seller's own customers.
+//
+// Kept in lockstep with src/data/masterCatalog.js in the main storefront app (same ids, same
+// order) so a seller's stocked products resolve to the same catalog entry here when the admin
+// places an order. Once a seller's KYC is approved they can add any of these to their shop; the
+// admin then orders against whatever a seller has stocked. Beyond the hand-curated starter list
+// below, every product sold on the storefront (imported from the live catalogue in
+// importedProducts.js — ~4,900 items across 20 categories) is also added to the catalog, so a
+// seller can stock essentially anything a customer can buy.
+
+import { importedProducts } from './importedProducts'
 
 const ASSETS_BASE = '/assets/U Seller Store — Shop Premium Products-images'
 
@@ -100,10 +110,25 @@ const raw = [
   { name: 'Olaplex No. 3 Hair Perfector, Repairing Hair Treatment for Damaged and Color-Treated Hair', category: 'Beauty & Personal Care', cost: 21.90, sell: 28.99, image: `${ASSETS_BASE}/71xlsrz3PvL._AC_SL400_.jpg` },
 ]
 
-export const masterCatalog = raw.map((item, index) => ({
+const curated = raw.map((item, index) => ({
   id: `cat-${index + 1}`,
   ...item,
 }))
+
+// Wholesale cost isn't tracked separately for the storefront's live catalogue, so it's estimated
+// at a 20% margin off the retail ("sell") price the customer pays — in line with the curated list above.
+const SELLER_MARGIN = 0.8
+
+const imported = importedProducts.map((item) => ({
+  id: `imp-${item.id}`,
+  name: item.name,
+  category: item.category,
+  cost: Math.round(item.price * SELLER_MARGIN * 100) / 100,
+  sell: item.price,
+  image: item.image,
+}))
+
+export const masterCatalog = [...curated, ...imported]
 
 export const catalogCategories = ['All categories', ...Array.from(new Set(masterCatalog.map((item) => item.category)))]
 
