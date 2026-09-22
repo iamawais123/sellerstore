@@ -24,7 +24,7 @@ const CardAction = ({ onClick, tone, children }) => (
 
 const SuperDashboard = () => {
   const navigate = useNavigate()
-  const { superAdmin, superAdmins, admins, superLogs, getAdminStats, loginAsAdmin } = useSuperAuth()
+  const { superAdmin, superAdmins, admins, superLogs, getAdminStats, getNetworkRevenueSeries, loginAsAdmin } = useSuperAuth()
   const [alertDismissed, setAlertDismissed] = useState(false)
   const [loginError, setLoginError] = useState('')
 
@@ -43,6 +43,26 @@ const SuperDashboard = () => {
 
   const roster = [...perAdmin].sort((a, b) => b.stats.sellers - a.stats.sellers).slice(0, 5)
   const showAlert = !alertDismissed && unassigned.length > 0
+
+  const revenueData = getNetworkRevenueSeries(myAdmins.map((a) => a.id))
+  const weekRevenue = revenueData.reduce((total, d) => total + d.rev, 0)
+  const weekOrders = revenueData.reduce((total, d) => total + d.orders, 0)
+  const maxRev = Math.max(1, ...revenueData.map((d) => d.rev))
+  const maxOrders = Math.max(1, ...revenueData.map((d) => d.orders))
+  const chartH = 220
+  const chartW = 600
+  const padL = 40
+  const padR = 20
+  const padT = 20
+  const padB = 40
+  const xAt = (i) => padL + (i * (chartW - padL - padR)) / (revenueData.length - 1)
+  const yAt = (v) => padT + chartH - padT - padB - ((v / maxRev) * (chartH - padT - padB))
+  const yAtOrders = (v) => padT + chartH - padT - padB - ((v / maxOrders) * (chartH - padT - padB))
+  const barW = ((chartW - padL - padR) / revenueData.length) * 0.42
+  const areaPath =
+    revenueData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(d.rev)}`).join(' ') +
+    ` L ${xAt(revenueData.length - 1)} ${chartH - padB} L ${xAt(0)} ${chartH - padB} Z`
+  const linePath = revenueData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(d.rev)}`).join(' ')
 
   const handleLoginAs = async (admin) => {
     const result = await loginAsAdmin(admin.id)
@@ -167,6 +187,118 @@ const SuperDashboard = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 lg:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100">
+              <Icon name="activity" className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-[22px] font-black text-gray-900 leading-tight">Daily Revenue & Order Volume</h2>
+              <p className="text-gray-500 font-medium text-[14.5px] mt-0.5">Past 7 days · across your admins' networks</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 shrink-0">
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-bold text-gray-500">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" /> Revenue (delivered)
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-bold text-gray-500">
+              <span className="w-2.5 h-2.5 rounded-sm bg-indigo-200" /> Orders (all)
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-6 lg:gap-10 mb-6">
+          <div>
+            <p className="text-gray-500 font-bold uppercase tracking-[0.18em] text-[12.5px] mb-1.5">Revenue</p>
+            <p className="text-4xl lg:text-5xl font-black text-gray-900 tracking-tight">{money(weekRevenue)}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 font-bold uppercase tracking-[0.18em] text-[12.5px] mb-1.5">Orders</p>
+            <p className="text-4xl lg:text-5xl font-black text-indigo-600 tracking-tight">{weekOrders}</p>
+          </div>
+        </div>
+
+        {weekOrders === 0 ? (
+          <div className="rounded-2xl border-2 border-dashed border-gray-200 py-14 text-center font-bold text-gray-400">
+            No orders in the past 7 days yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full min-w-[480px] h-auto">
+              <defs>
+                <linearGradient id="superRevArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.02" />
+                </linearGradient>
+              </defs>
+
+              {[0, 0.33, 0.66, 1].map((t) => (
+                <line
+                  key={t}
+                  x1={padL}
+                  x2={chartW - padR}
+                  y1={padT + (chartH - padT - padB) * t}
+                  y2={padT + (chartH - padT - padB) * t}
+                  stroke="#e5e7eb"
+                  strokeDasharray="4 6"
+                />
+              ))}
+
+              {[maxRev, maxRev / 2, 0].map((v, i) => (
+                <text
+                  key={i}
+                  x={padL - 8}
+                  y={padT + ((chartH - padT - padB) / 2) * i + 4}
+                  textAnchor="end"
+                  className="fill-gray-400"
+                  style={{ fontSize: '11px', fontWeight: 600 }}
+                >
+                  {Math.round(v)}
+                </text>
+              ))}
+
+              {revenueData.map((d, i) => (
+                <rect
+                  key={`bar-${i}`}
+                  x={xAt(i) - barW / 2}
+                  y={yAtOrders(d.orders)}
+                  width={barW}
+                  height={Math.max(0, chartH - padB - yAtOrders(d.orders))}
+                  rx="3"
+                  fill="#c7d2fe"
+                />
+              ))}
+
+              <path d={areaPath} fill="url(#superRevArea)" />
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#4f46e5"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              {revenueData.map((d, i) => (
+                <g key={i}>
+                  <circle cx={xAt(i)} cy={yAt(d.rev)} r="5" fill="#fff" stroke="#4f46e5" strokeWidth="2.5" />
+                  <text
+                    x={xAt(i)}
+                    y={chartH - 14}
+                    textAnchor="middle"
+                    className="fill-gray-500"
+                    style={{ fontSize: '13px', fontWeight: 700 }}
+                  >
+                    {d.d}
+                  </text>
+                </g>
+              ))}
+            </svg>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 lg:p-8">

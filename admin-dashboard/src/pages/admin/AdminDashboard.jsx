@@ -47,6 +47,7 @@ const AdminDashboard = () => {
   const weekRevenue = revenueData.reduce((sum, d) => sum + d.rev, 0)
   const weekOrders = revenueData.reduce((sum, d) => sum + d.orders, 0)
   const maxRev = Math.max(1, ...revenueData.map((d) => d.rev))
+  const maxOrders = Math.max(1, ...revenueData.map((d) => d.orders))
   const chartH = 220
   const chartW = 600
   const padL = 40
@@ -56,6 +57,8 @@ const AdminDashboard = () => {
 
   const xAt = (i) => padL + (i * (chartW - padL - padR)) / (revenueData.length - 1)
   const yAt = (v) => padT + chartH - padT - padB - ((v / maxRev) * (chartH - padT - padB))
+  const yAtOrders = (v) => padT + chartH - padT - padB - ((v / maxOrders) * (chartH - padT - padB))
+  const barW = ((chartW - padL - padR) / revenueData.length) * 0.42
 
   const areaPath =
     revenueData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(d.rev)}`).join(' ') +
@@ -300,7 +303,7 @@ const AdminDashboard = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 lg:p-8">
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
           <div className="flex items-center space-x-3.5">
             <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100">
               <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,9 +315,17 @@ const AdminDashboard = () => {
                 Daily Revenue & Order Volume
               </h2>
               <p className="text-gray-500 font-medium text-[14.5px] mt-0.5">
-                Past 7 days · delivered orders only
+                Past 7 days
               </p>
             </div>
+          </div>
+          <div className="flex items-center gap-4 shrink-0">
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-bold text-gray-500">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" /> Revenue (delivered)
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-bold text-gray-500">
+              <span className="w-2.5 h-2.5 rounded-sm bg-indigo-200" /> Orders (all)
+            </span>
           </div>
         </div>
 
@@ -374,6 +385,18 @@ const AdminDashboard = () => {
                 >
                   {Math.round(v)}
                 </text>
+              ))}
+
+              {revenueData.map((d, i) => (
+                <rect
+                  key={`bar-${i}`}
+                  x={xAt(i) - barW / 2}
+                  y={yAtOrders(d.orders)}
+                  width={barW}
+                  height={Math.max(0, chartH - padB - yAtOrders(d.orders))}
+                  rx="3"
+                  fill="#c7d2fe"
+                />
               ))}
 
               <path d={areaPath} fill="url(#revArea)" />

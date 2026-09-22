@@ -398,6 +398,24 @@ export function SuperAuthProvider({ children }) {
     }
   }
 
+  // Day-by-day revenue/order series for the admins in `adminIds`, past 7 days — same shape the admin
+  // console's own dashboard chart uses, so the super admin console can show the network-wide equivalent.
+  const getNetworkRevenueSeries = (adminIds) => {
+    const sellerIds = new Set(network.sellers.filter((s) => adminIds.includes(s.adminId) && !s.deleted).map((s) => s.id))
+    const orders = network.orders.filter((o) => sellerIds.has(o.sellerId) && Array.isArray(o.items))
+    const days = []
+    const today = new Date()
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(today)
+      day.setDate(today.getDate() - i)
+      const dayKey = day.toDateString()
+      const dayOrders = orders.filter((o) => new Date(o.createdAt).toDateString() === dayKey)
+      const rev = dayOrders.filter((o) => o.status === 'Delivered').reduce((sum, o) => sum + (o.total || 0), 0)
+      days.push({ d: day.toLocaleDateString('en-US', { weekday: 'narrow' }), rev, orders: dayOrders.length })
+    }
+    return days
+  }
+
   const value = {
     superAdmin,
     isSuperAdminLoggedIn: !!superAdmin,
@@ -428,6 +446,7 @@ export function SuperAuthProvider({ children }) {
     getSuperAdminById,
     getAdminLoginHistory,
     getAdminStats,
+    getNetworkRevenueSeries,
     generatePassword: generateStrongPassword,
   }
 

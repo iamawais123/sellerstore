@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { isOnline } from '../../lib/supportChat'
@@ -144,7 +145,7 @@ const PasswordModal = ({ seller, onClose }) => {
     else setError(res.error || 'Could not send the reset email.')
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
@@ -190,7 +191,8 @@ const PasswordModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -227,7 +229,7 @@ const NotificationModal = ({ seller, onClose }) => {
     setTimeout(() => { setSent(false); setTab('history') }, 800)
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="bg-gradient-to-br from-violet-500/10 to-indigo-500/10 p-6 border-b border-gray-100">
@@ -376,7 +378,8 @@ const NotificationModal = ({ seller, onClose }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -407,10 +410,10 @@ const ActivityModal = ({ seller, onClose }) => {
     { id: 'campaigns', label: 'Campaigns', count: campaigns.length },
   ]
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="relative bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 p-6">
+      <div className="w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="relative bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 p-6 shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-4">
               <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur text-white flex items-center justify-center shrink-0">
@@ -432,7 +435,7 @@ const ActivityModal = ({ seller, onClose }) => {
           </div>
         </div>
 
-        <div className="p-5">
+        <div className="p-5 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-3 mb-5">
             {statCards.map((s) => (
               <div key={s.key} className="rounded-2xl border-2 border-gray-100 bg-gray-50/50 p-4">
@@ -465,7 +468,7 @@ const ActivityModal = ({ seller, onClose }) => {
             ))}
           </div>
 
-          <div className="max-h-[45vh] overflow-y-auto space-y-3 pr-1">
+          <div className="space-y-3 pr-1">
             {tab === 'ledger' && (
               ledger.length === 0 ? (
                 <div className="border-2 border-dashed border-gray-200 rounded-3xl py-16 text-center">
@@ -595,7 +598,8 @@ const ActivityModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -624,7 +628,7 @@ const LoginHistoryModal = ({ seller, onClose }) => {
     try { navigator.clipboard.writeText(ip) } catch (_) {}
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6 border-b border-gray-100">
@@ -704,7 +708,8 @@ const LoginHistoryModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -731,7 +736,7 @@ const BalanceModal = ({ seller, onClose }) => {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -793,7 +798,8 @@ const BalanceModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -820,7 +826,7 @@ const GuaranteeModal = ({ seller, onClose }) => {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -882,7 +888,8 @@ const GuaranteeModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -914,7 +921,7 @@ const RatingModal = ({ seller, onClose }) => {
 
   const presets = [5.0, 4.5, 4.0, 3.5, 3.0]
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -988,7 +995,8 @@ const RatingModal = ({ seller, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1016,7 +1024,7 @@ const ProductLimitModal = ({ seller, onClose }) => {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -1076,7 +1084,8 @@ const ProductLimitModal = ({ seller, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1151,7 +1160,7 @@ const ViewsBoosterModal = ({ seller, onClose }) => {
 
   const refreshActive = () => setActive(getActiveViewsCampaign(seller.id))
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-5 border-b border-gray-100">
@@ -1343,7 +1352,8 @@ const ViewsBoosterModal = ({ seller, onClose }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1367,7 +1377,7 @@ const SuspendModal = ({ seller, onClose }) => {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -1417,7 +1427,8 @@ const SuspendModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1441,7 +1452,7 @@ const BlockWithdrawalsModal = ({ seller, onClose }) => {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -1491,7 +1502,8 @@ const BlockWithdrawalsModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1514,7 +1526,7 @@ const AllowProductRemovalModal = ({ seller, onClose }) => {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -1562,7 +1574,8 @@ const AllowProductRemovalModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1592,7 +1605,7 @@ const DeleteStoreModal = ({ seller, onClose }) => {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -1663,7 +1676,8 @@ const DeleteStoreModal = ({ seller, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
