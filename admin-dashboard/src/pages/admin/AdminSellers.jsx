@@ -145,16 +145,23 @@ const PasswordModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="sm:hidden flex justify-center pt-3 pb-1">
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
-              <Icon name="key" className="w-5 h-5" />
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+              <Icon name="key" className="w-7 h-7" />
             </div>
             <div>
-              <h3 className="text-2xl font-black text-gray-900">Password — {seller.fullName}</h3>
-              <p className="text-gray-500 mt-1">Passwords are private to each seller. Send them a reset link so they can choose a new one.</p>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">{seller.shopName || seller.fullName}</p>
+              <h3 className="text-3xl font-black text-gray-900 mt-1">Password</h3>
+              <p className="text-gray-500 mt-1 font-medium">
+                Sign-in passwords are hashed and never stored anywhere in the clear, so there's no "current password" to show — not to us, not
+                to you. Send a secure reset link instead and the seller picks their own new one.
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
@@ -162,29 +169,30 @@ const PasswordModal = ({ seller, onClose }) => {
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-6">
+        <div className="px-6 pb-6 space-y-5">
           <div>
             <label className="block text-xs font-bold uppercase tracking-[0.12em] text-gray-500 mb-2">Reset link will be sent to</label>
-            <input
-              type="text"
-              readOnly
-              value={seller.email || 'No email on file'}
-              className="w-full px-4 py-3.5 bg-gray-50 border-2 border-gray-100 rounded-2xl text-gray-700 font-mono focus:outline-none"
-            />
+            <div className="flex items-center gap-3 px-4 py-3.5 bg-gray-50 border-2 border-gray-100 rounded-2xl">
+              <div className="w-9 h-9 rounded-xl bg-white border border-gray-200 text-gray-400 flex items-center justify-center shrink-0">
+                <Icon name="send" className="w-4 h-4" />
+              </div>
+              <span className="text-gray-800 font-mono font-bold truncate">{seller.email || 'No email on file'}</span>
+            </div>
           </div>
 
-          {error && <p role="alert" className="text-rose-600 font-semibold text-sm">{error}</p>}
-          {success && <p role="status" className="text-emerald-600 font-semibold text-sm">{success}</p>}
+          {error && <p role="alert" className="text-rose-600 font-bold text-sm">{error}</p>}
+          {success && <p role="status" className="text-emerald-600 font-bold text-sm">{success}</p>}
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
-            <button onClick={onClose} className="px-5 py-3 rounded-2xl font-bold text-gray-700 hover:bg-gray-100 transition-colors">
+            <button onClick={onClose} className="px-5 py-3.5 rounded-2xl font-bold text-gray-700 hover:bg-gray-100 transition-colors">
               Close
             </button>
             <button
               onClick={doSend}
               disabled={sending || !seller.email}
-              className="px-5 py-3 rounded-2xl font-bold text-white bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 shadow-lg shadow-violet-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-black text-white bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black shadow-lg shadow-slate-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              <Icon name="send" className="w-5 h-5" />
               {sending ? 'Sending…' : 'Send reset email'}
             </button>
           </div>
