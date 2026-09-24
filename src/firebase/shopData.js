@@ -621,6 +621,8 @@ export const submitKyc = (db, shop, { docType, front, back }) =>
 // Auto-advances a seller's own paid order one stage through the delivery flow.
 // Deliberately minimal (no notifications / activity logs) so the seller has permission to call it.
 // On Delivered: credits the profit back into the shop balance and updates orderStats.
+const DELIVERY_NEXT = { Paid: 'Pickup', Pickup: 'On the way', 'On the way': 'Out for delivery', 'Out for delivery': 'Delivered' }
+
 export const sellerAdvanceOrderStatus = (db, sellerId, orderId, newStatus) =>
   attempt(() =>
     runTransaction(db, async (tx) => {
@@ -631,6 +633,9 @@ export const sellerAdvanceOrderStatus = (db, sellerId, orderId, newStatus) =>
       if (!orderSnap.exists() || orderSnap.data().sellerId !== sellerId) refuse('Order not found')
       const shop = shopSnap.data()
       const order = orderSnap.data()
+
+      // Guard: only advance to the correct next stage (prevents race-condition double-advances)
+      if (DELIVERY_NEXT[order.status] !== newStatus) return { success: true }
 
       const orderChanges = { status: newStatus, updatedAt: nowIso() }
       if (newStatus === 'Delivered' && !order.profitCredited) {
