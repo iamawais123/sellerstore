@@ -631,7 +631,14 @@ export const payOrder = (db, sellerId, orderId, actorId = sellerId) =>
       const order = orderSnap.data()
       if (order.status !== 'Unpaid') refuse('This order has already been processed')
       if ((shop.balance || 0) < order.cost) refuse('Your shop balance is too low. Top up your wallet to process this order.')
-      tx.update(orderRef, { status: 'Paid', paidAt: nowIso() })
+      const paidMs = Date.now()
+      const stageTimestamps = {
+        Pickup: new Date(paidMs + 1 * 60 * 1000).toISOString(),
+        'On the way': new Date(paidMs + 3 * 60 * 1000).toISOString(),
+        'Out for delivery': new Date(paidMs + 6 * 60 * 1000).toISOString(),
+        Delivered: new Date(paidMs + 10 * 60 * 1000).toISOString(),
+      }
+      tx.update(orderRef, { status: 'Paid', paidAt: nowIso(), stageTimestamps })
       tx.update(shopRef, { balance: round2((shop.balance || 0) - order.cost) })
       stageActivity(db, tx, { adminId: shop.adminId, sellerId, actorId, type: 'order_paid', title: 'Paid to process order', entity: shop.fullName, icon: 'pay', amount: order.cost })
       return { success: true }

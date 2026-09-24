@@ -181,8 +181,10 @@ const OrderCard = ({ order, seller, onPay }) => {
   )
 }
 
+const ORDER_FLOW = ['Unpaid', 'Paid', 'Pickup', 'On the way', 'Out for delivery', 'Delivered']
+
 const SellerOrders = () => {
-  const { seller, getSellerOrders, paySellerOrder, getSellerNotifications, markNotificationRead } = useAuth()
+  const { seller, getSellerOrders, paySellerOrder, advanceSellerOrderStatus, getSellerNotifications, markNotificationRead } = useAuth()
   const [status, setStatus] = useState('All')
   const orders = getSellerOrders(seller.id)
   const visibleOrders = useMemo(() => orders.filter((order) => status === 'All' || order.status === status), [orders, status])
@@ -192,6 +194,26 @@ const SellerOrders = () => {
     const unread = getSellerNotifications().filter((n) => !n.read && n.type === 'order')
     unread.forEach((n) => markNotificationRead(seller.id, n.id))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-advance paid orders through delivery stages based on stageTimestamps
+  useEffect(() => {
+    const advance = () => {
+      const now = Date.now()
+      orders.forEach((order) => {
+        if (!order.stageTimestamps || order.status === 'Delivered' || order.status === 'Cancelled' || order.status === 'Unpaid') return
+        const currentIdx = ORDER_FLOW.indexOf(order.status)
+        if (currentIdx === -1 || currentIdx >= ORDER_FLOW.length - 1) return
+        const nextStatus = ORDER_FLOW[currentIdx + 1]
+        const nextAt = order.stageTimestamps[nextStatus]
+        if (nextAt && now >= new Date(nextAt).getTime()) {
+          advanceSellerOrderStatus(order.id, nextStatus)
+        }
+      })
+    }
+    advance()
+    const timer = setInterval(advance, 30_000)
+    return () => clearInterval(timer)
+  }, [orders]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePay = (orderId) => paySellerOrder(seller.id, orderId)
 
