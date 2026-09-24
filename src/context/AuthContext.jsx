@@ -578,8 +578,8 @@ export function AuthProvider({ children }) {
   const advanceSellerOrderStatus = async (orderId, newStatus) => {
     const problem = needSeller()
     if (problem) return problem
-    const { db, actorId } = acting()
-    return shopData.setOrderStatus(db, sellerRef.current, orderId, newStatus, actorId)
+    const { db } = acting()
+    return shopData.sellerAdvanceOrderStatus(db, sellerRef.current.id, orderId, newStatus)
   }
 
   // ---- seller shop catalog (the master catalog products a seller has added to their shop) ----------

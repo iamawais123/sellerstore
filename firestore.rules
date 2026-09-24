@@ -298,6 +298,11 @@ service cloud.firestore {
           || (diffKeys().hasOnly(['balance'])
               && request.resource.data.balance < resource.data.balance
               && request.resource.data.balance >= 0)
+          // Profit credited when seller's own order reaches Delivered (paired write in order rule).
+          || (diffKeys().hasOnly(['balance', 'orderStats'])
+              && request.resource.data.balance > resource.data.balance
+              && request.resource.data.balance >= 0
+              && request.resource.data.orderStats is map)
           || (diffKeys().hasOnly(['productIds'])
               && resource.data.verified == true
               && shopOpen(resource.data)
@@ -368,10 +373,25 @@ service cloud.firestore {
         (resource.data.sellerId == request.auth.uid
           && resource.data.status == 'Unpaid'
           && request.resource.data.status == 'Paid'
-          && diffKeys().hasOnly(['status', 'paidAt'])
+          && diffKeys().hasOnly(['status', 'paidAt', 'stageTimestamps'])
           && shopOpen(shopOf(resource.data.sellerId))
           && shopOf(resource.data.sellerId).balance >= resource.data.cost
           && sameMoney(shopAfter(resource.data.sellerId).balance, shopOf(resource.data.sellerId).balance - resource.data.cost))
+        // The seller auto-advances through intermediate delivery stages (no money moves).
+        || (resource.data.sellerId == request.auth.uid
+          && resource.data.status in ['Paid', 'Pickup', 'On the way']
+          && request.resource.data.status in ['Pickup', 'On the way', 'Out for delivery']
+          && diffKeys().hasOnly(['status', 'updatedAt'])
+          && shopOpen(shopOf(resource.data.sellerId)))
+        // The seller marks their order Delivered: profit is credited to their balance in the same batch.
+        || (resource.data.sellerId == request.auth.uid
+          && resource.data.status == 'Out for delivery'
+          && request.resource.data.status == 'Delivered'
+          && diffKeys().hasOnly(['status', 'updatedAt', 'profitCredited'])
+          && !resource.data.get('profitCredited', false)
+          && request.resource.data.profitCredited == true
+          && shopOpen(shopOf(resource.data.sellerId))
+          && sameMoney(shopAfter(resource.data.sellerId).balance, shopOf(resource.data.sellerId).balance + resource.data.profit))
         // The admin moves it along (pickup, delivery, ...) — or pays on the seller's behalf.
         || (managesDoc()
             && diffKeys().hasOnly(['status', 'updatedAt', 'paidAt', 'profitCredited'])

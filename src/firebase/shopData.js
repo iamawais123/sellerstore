@@ -618,6 +618,34 @@ export const submitKyc = (db, shop, { docType, front, back }) =>
 
 // ---- seller: orders, wallet, catalogue ----------------------------------------------------------
 
+// Auto-advances a seller's own paid order one stage through the delivery flow.
+// Deliberately minimal (no notifications / activity logs) so the seller has permission to call it.
+// On Delivered: credits the profit back into the shop balance and updates orderStats.
+export const sellerAdvanceOrderStatus = (db, sellerId, orderId, newStatus) =>
+  attempt(() =>
+    runTransaction(db, async (tx) => {
+      const shopRef = doc(db, COL.shops, sellerId)
+      const orderRef = doc(db, COL.orders, orderId)
+      const [shopSnap, orderSnap] = [await tx.get(shopRef), await tx.get(orderRef)]
+      if (!shopSnap.exists()) refuse('Seller not found')
+      if (!orderSnap.exists() || orderSnap.data().sellerId !== sellerId) refuse('Order not found')
+      const shop = shopSnap.data()
+      const order = orderSnap.data()
+
+      const orderChanges = { status: newStatus, updatedAt: nowIso() }
+      if (newStatus === 'Delivered' && !order.profitCredited) {
+        orderChanges.profitCredited = true
+        const stats = { total: 0, pending: 0, delivered: 0, ...(shop.orderStats || {}) }
+        tx.update(shopRef, {
+          balance: round2((shop.balance || 0) + (order.profit || 0)),
+          orderStats: { ...stats, pending: Math.max(0, stats.pending - 1), delivered: stats.delivered + 1 },
+        })
+      }
+      tx.update(orderRef, orderChanges)
+      return { success: true }
+    })
+  )
+
 // The seller pays an order's cost out of their shop balance; the order becomes "Paid".
 export const payOrder = (db, sellerId, orderId, actorId = sellerId) =>
   attempt(() =>
