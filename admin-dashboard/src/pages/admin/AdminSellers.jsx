@@ -145,7 +145,7 @@ const PasswordModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -228,7 +228,7 @@ const NotificationModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="bg-gradient-to-br from-violet-500/10 to-indigo-500/10 p-6 border-b border-gray-100">
           <div className="flex items-start justify-between">
@@ -625,7 +625,7 @@ const LoginHistoryModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6 border-b border-gray-100">
           <div className="flex items-start space-x-3">
@@ -732,7 +732,7 @@ const BalanceModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -818,7 +818,7 @@ const GuaranteeModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -909,7 +909,7 @@ const RatingModal = ({ seller, onClose }) => {
   const presets = [5.0, 4.5, 4.0, 3.5, 3.0]
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -1008,7 +1008,7 @@ const ProductLimitModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -1140,7 +1140,7 @@ const ViewsBoosterModal = ({ seller, onClose }) => {
   const refreshActive = () => setActive(getActiveViewsCampaign(seller.id))
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-5 border-b border-gray-100">
           <div className="flex items-start space-x-3">
@@ -1356,7 +1356,7 @@ const SuspendModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -1427,7 +1427,7 @@ const BlockWithdrawalsModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -1497,7 +1497,7 @@ const AllowProductRemovalModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -1572,7 +1572,7 @@ const DeleteStoreModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">

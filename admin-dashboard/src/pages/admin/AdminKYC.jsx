@@ -94,7 +94,7 @@ const KYCDetailModal = ({ seller, onClose }) => {
   const rejected = kycStatus === 'Rejected'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in max-h-[95vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 border-b border-gray-100">
           <div className="flex items-start justify-between">

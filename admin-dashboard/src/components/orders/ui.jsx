@@ -61,7 +61,7 @@ export const Modal = ({ title, subtitle, icon, onClose, wide, footer, children }
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/75 p-0 sm:items-center sm:p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div role="dialog" aria-modal="true" aria-label={title} className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl ${wide ? 'sm:max-w-3xl' : 'sm:max-w-md'}`}>
         <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
           {icon && (

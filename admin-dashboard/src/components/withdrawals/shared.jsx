@@ -128,7 +128,7 @@ export const ModalShell = ({ title, subtitle, icon, onClose, busy, footer, child
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose()
       }}
