@@ -415,8 +415,8 @@ const AdminLayout = () => {
                 <h1 className="text-xl lg:text-2xl font-bold text-gray-900">{currentPage.label}</h1>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="relative" ref={bellRef}>
+            <div className="relative flex items-center space-x-2" ref={bellRef}>
+              <div>
                 <button
                   onClick={() => setBellOpen((open) => !open)}
                   aria-label={unreadNotifications.length ? `Notifications, ${unreadNotifications.length} unread` : 'Notifications'}
