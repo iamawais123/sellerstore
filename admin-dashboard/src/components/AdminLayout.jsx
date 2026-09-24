@@ -382,7 +382,7 @@ const AdminLayout = () => {
       </aside>
 
       <main className="flex-1 min-w-0 lg:ml-[280px]">
-        <div className="sticky top-0 z-20">
+        <div className="sticky top-0" style={{ zIndex: 2 }}>
         {impersonation && (
           <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-violet-600 to-indigo-600 px-5 lg:px-8 py-3 text-white">
             <p className="text-sm font-semibold">
@@ -398,7 +398,7 @@ const AdminLayout = () => {
             </a>
           </div>
         )}
-        <div className="bg-white/80 backdrop-blur-xl border-b border-gray-100 px-5 lg:px-8 py-4">
+        <div className="bg-white border-b border-gray-100 px-5 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <button

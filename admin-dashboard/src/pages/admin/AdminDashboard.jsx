@@ -47,20 +47,34 @@ const AdminDashboard = () => {
   const weekRevenue = revenueData.reduce((sum, d) => sum + d.rev, 0)
   const weekOrders = revenueData.reduce((sum, d) => sum + d.orders, 0)
   const maxRev = Math.max(1, ...revenueData.map((d) => d.rev))
-  const chartH = 220
-  const chartW = 600
-  const padL = 40
-  const padR = 20
+  const maxOrd = Math.max(1, ...revenueData.map((d) => d.orders))
+  const chartH = 240
+  const chartW = 660
+  const padL = 54
+  const padR = 46
   const padT = 20
-  const padB = 40
+  const padB = 44
+  const plotW = chartW - padL - padR
+  const plotH = chartH - padT - padB
 
-  const xAt = (i) => padL + (i * (chartW - padL - padR)) / (revenueData.length - 1)
-  const yAt = (v) => padT + chartH - padT - padB - ((v / maxRev) * (chartH - padT - padB))
+  const xAt = (i) => padL + (i / (revenueData.length - 1)) * plotW
+  const yAt = (v) => padT + plotH - (v / maxRev) * plotH
+  const yAtOrd = (v) => padT + plotH - (v / maxOrd) * plotH
 
-  const areaPath =
-    revenueData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(d.rev)}`).join(' ') +
-    ` L ${xAt(revenueData.length - 1)} ${chartH - padB} L ${xAt(0)} ${chartH - padB} Z`
-  const linePath = revenueData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(d.rev)}`).join(' ')
+  const buildPath = (pts) => pts.reduce((d, p, i, a) => {
+    if (i === 0) return `M ${p[0]} ${p[1]}`
+    const pr = a[i - 1], pp = i > 1 ? a[i - 2] : pr, nx = i < a.length - 1 ? a[i + 1] : p, t = 0.25
+    return `${d} C ${(pr[0] + (p[0] - pp[0]) * t).toFixed(1)},${(pr[1] + (p[1] - pp[1]) * t).toFixed(1)} ${(p[0] - (nx[0] - pr[0]) * t).toFixed(1)},${(p[1] - (nx[1] - pr[1]) * t).toFixed(1)} ${p[0].toFixed(1)},${p[1].toFixed(1)}`
+  }, '')
+
+  const revPts = revenueData.map((d, i) => [xAt(i), yAt(d.rev)])
+  const ordPts = revenueData.map((d, i) => [xAt(i), yAtOrd(d.orders)])
+  const linePath = buildPath(revPts)
+  const ordPath = buildPath(ordPts)
+  const baseline = padT + plotH
+  const areaPath = `${linePath} L ${xAt(revenueData.length - 1).toFixed(1)} ${baseline} L ${xAt(0).toFixed(1)} ${baseline} Z`
+  const ordAreaPath = `${ordPath} L ${xAt(revenueData.length - 1).toFixed(1)} ${baseline} L ${xAt(0).toFixed(1)} ${baseline} Z`
+  const fmtRev = (v) => v >= 10000 ? `$${Math.round(v / 1000)}k` : v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`
 
   const getLogIcon = (icon) => {
     switch (icon) {
@@ -312,7 +326,7 @@ const AdminDashboard = () => {
                 Daily Revenue & Order Volume
               </h2>
               <p className="text-gray-500 font-medium text-[14.5px] mt-0.5">
-                Past 7 days · delivered orders only
+                Past 7 days · revenue from delivered orders
               </p>
             </div>
           </div>
@@ -337,77 +351,115 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* HTML legend */}
+        <div className="flex items-center gap-5 mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-indigo-600" />
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Revenue</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <svg width="20" height="12" className="shrink-0">
+              <line x1="0" y1="6" x2="20" y2="6" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" />
+              <circle cx="10" cy="6" r="3" fill="white" stroke="#f97316" strokeWidth="1.5" />
+            </svg>
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Orders</span>
+          </div>
+        </div>
+
         {weekOrders === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-14 text-center font-bold text-gray-400">
             No orders in the past 7 days yet.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full min-w-[480px] h-auto">
-              <defs>
-                <linearGradient id="revArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.02" />
-                </linearGradient>
-              </defs>
+          <div className="overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <style>{`.chart-scroll::-webkit-scrollbar{display:none}`}</style>
+            <div className="chart-scroll" style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
+              <svg viewBox={`0 0 ${chartW} ${chartH}`} className="h-auto" style={{ width: '100%', minWidth: '520px', display: 'block' }}>
+                <defs>
+                  <linearGradient id="revArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.22" />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                  </linearGradient>
+                  <linearGradient id="ordArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f97316" stopOpacity="0.12" />
+                    <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+                  </linearGradient>
+                  <filter id="glow-indigo">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                  <filter id="glow-orange">
+                    <feGaussianBlur stdDeviation="1.5" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                </defs>
 
-              {[0, 0.33, 0.66, 1].map((t) => (
-                <line
-                  key={t}
-                  x1={padL}
-                  x2={chartW - padR}
-                  y1={padT + (chartH - padT - padB) * t}
-                  y2={padT + (chartH - padT - padB) * t}
-                  stroke="#e5e7eb"
-                  strokeDasharray="4 6"
-                />
-              ))}
-
-              {[maxRev, maxRev / 2, 0].map((v, i) => (
-                <text
-                  key={i}
-                  x={padL - 8}
-                  y={padT + ((chartH - padT - padB) / 2) * i + 4}
-                  textAnchor="end"
-                  className="fill-gray-400"
-                  style={{ fontSize: '11px', fontWeight: 600 }}
-                >
-                  {Math.round(v)}
-                </text>
-              ))}
-
-              <path d={areaPath} fill="url(#revArea)" />
-              <path
-                d={linePath}
-                fill="none"
-                stroke="#4f46e5"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-
-              {revenueData.map((d, i) => (
-                <g key={i}>
-                  <circle
-                    cx={xAt(i)}
-                    cy={yAt(d.rev)}
-                    r="5"
-                    fill="#fff"
-                    stroke="#4f46e5"
-                    strokeWidth="2.5"
+                {/* Horizontal grid lines */}
+                {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+                  <line
+                    key={t}
+                    x1={padL} x2={chartW - padR}
+                    y1={padT + plotH * t} y2={padT + plotH * t}
+                    stroke={t === 1 ? '#d1d5db' : '#f3f4f6'}
+                    strokeWidth={t === 1 ? 1 : 1}
                   />
-                  <text
-                    x={xAt(i)}
-                    y={chartH - 14}
-                    textAnchor="middle"
-                    className="fill-gray-500"
-                    style={{ fontSize: '13px', fontWeight: 700 }}
-                  >
-                    {d.d}
+                ))}
+
+                {/* Left Y-axis (revenue) */}
+                {[maxRev, maxRev * 0.75, maxRev * 0.5, maxRev * 0.25, 0].map((v, i) => (
+                  <text key={i} x={padL - 8} y={yAt(v) + 4} textAnchor="end" fill="#9ca3af" style={{ fontSize: '10px', fontWeight: 700 }}>
+                    {fmtRev(v)}
                   </text>
-                </g>
-              ))}
-            </svg>
+                ))}
+
+                {/* Right Y-axis (orders) */}
+                {[maxOrd, maxOrd * 0.75, maxOrd * 0.5, maxOrd * 0.25, 0].map((v, i) => (
+                  <text key={i} x={chartW - padR + 8} y={yAtOrd(v) + 4} textAnchor="start" fill="#fb923c" style={{ fontSize: '10px', fontWeight: 700 }}>
+                    {Math.round(v)}
+                  </text>
+                ))}
+
+                {/* Order area + line */}
+                <path d={ordAreaPath} fill="url(#ordArea)" />
+                <path d={ordPath} fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 4" opacity="0.85" />
+
+                {/* Revenue area + line */}
+                <path d={areaPath} fill="url(#revArea)" />
+                <path d={linePath} fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#glow-indigo)" />
+
+                {/* Data points & labels */}
+                {revenueData.map((d, i) => {
+                  const ox = xAt(i), oy = yAtOrd(d.orders)
+                  const rx = xAt(i), ry = yAt(d.rev)
+                  const ordLabelY = Math.max(padT + 11, oy - 9)
+                  const revLabelY = Math.max(padT + 11, ry - 9)
+                  return (
+                    <g key={i}>
+                      {/* Order dot */}
+                      <circle cx={ox} cy={oy} r="6" fill="#f97316" opacity="0.12" />
+                      <circle cx={ox} cy={oy} r="3.5" fill="#fff" stroke="#f97316" strokeWidth="2" />
+                      {d.orders > 0 && (
+                        <text x={ox} y={ordLabelY} textAnchor="middle" fill="#ea6f0a" style={{ fontSize: '9.5px', fontWeight: 800 }}>
+                          {d.orders}
+                        </text>
+                      )}
+                      {/* Revenue dot */}
+                      <circle cx={rx} cy={ry} r="7" fill="#6366f1" opacity="0.1" />
+                      <circle cx={rx} cy={ry} r="4" fill="#fff" stroke="#4f46e5" strokeWidth="2.5" />
+                      {d.rev > 0 && (
+                        <text x={rx} y={revLabelY} textAnchor="middle" fill="#4338ca" style={{ fontSize: '9.5px', fontWeight: 800 }}>
+                          {fmtRev(d.rev)}
+                        </text>
+                      )}
+                      {/* Day label at bottom */}
+                      <text x={xAt(i)} y={chartH - 16} textAnchor="middle" fill="#9ca3af" style={{ fontSize: '11px', fontWeight: 700 }}>
+                        {d.d}
+                      </text>
+                    </g>
+                  )
+                })}
+              </svg>
+            </div>
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`
@@ -182,10 +182,16 @@ const OrderCard = ({ order, seller, onPay }) => {
 }
 
 const SellerOrders = () => {
-  const { seller, getSellerOrders, paySellerOrder } = useAuth()
+  const { seller, getSellerOrders, paySellerOrder, getSellerNotifications, markNotificationRead } = useAuth()
   const [status, setStatus] = useState('All')
   const orders = getSellerOrders(seller.id)
   const visibleOrders = useMemo(() => orders.filter((order) => status === 'All' || order.status === status), [orders, status])
+
+  // Clear the order badge when this page is opened
+  useEffect(() => {
+    const unread = getSellerNotifications().filter((n) => !n.read && n.type === 'order')
+    unread.forEach((n) => markNotificationRead(seller.id, n.id))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePay = (orderId) => paySellerOrder(seller.id, orderId)
 

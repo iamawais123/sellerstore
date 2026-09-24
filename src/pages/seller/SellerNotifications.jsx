@@ -65,11 +65,39 @@ const SellerNotifications = () => {
                   if (notification.type === 'chat') openSupportChat()
                   else if (!notification.read) markNotificationRead(seller.id, notification.id)
                 }}
-                className={`w-full rounded-2xl border p-4 text-left transition-colors ${notification.read ? 'border-gray-100 bg-gray-50' : 'border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50'}`}
+                className={`w-full rounded-2xl border p-4 text-left transition-colors ${
+                  notification.read
+                    ? 'border-gray-100 bg-gray-50'
+                    : notification.type === 'order'
+                    ? 'border-red-200 bg-red-50/60 hover:bg-red-50'
+                    : 'border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50'
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div><h3 className="font-bold text-gray-900">{notification.title}</h3><p className="mt-1 whitespace-pre-line text-sm text-gray-600">{notification.message}</p></div>
-                  {!notification.read && <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-1 text-xs font-bold text-indigo-700">New</span>}
+                  <div className="flex items-start gap-3 min-w-0">
+                    {!notification.read && notification.type === 'order' && (
+                      <span className="mt-0.5 shrink-0 w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <h3 className={`font-bold ${!notification.read && notification.type === 'order' ? 'text-red-700' : 'text-gray-900'}`}>
+                        {notification.title}
+                      </h3>
+                      <p className="mt-1 whitespace-pre-line text-sm text-gray-600">{notification.message}</p>
+                    </div>
+                  </div>
+                  {!notification.read && (
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${
+                      notification.type === 'order'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-indigo-100 text-indigo-700'
+                    }`}>
+                      {notification.type === 'order' ? 'Order' : 'New'}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-2 text-xs font-semibold text-gray-400">{notification.time}</p>
               </button>

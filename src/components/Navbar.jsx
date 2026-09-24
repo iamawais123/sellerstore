@@ -129,6 +129,7 @@ const Navbar = () => {
   const displayName = customer?.fullName || customer?.email || 'Account'
 
   return (
+  <>
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20 gap-2 sm:gap-4">
@@ -241,92 +242,95 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile / tablet menu */}
-      <div
-        className={`lg:hidden fixed inset-0 z-[80] ${menuOpen ? '' : 'pointer-events-none'}`}
-        aria-hidden={!menuOpen}
-      >
-        <div
-          onClick={() => setMenuOpen(false)}
-          className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${menuOpen ? 'opacity-100' : 'opacity-0'}`}
-        />
-        <aside
-          role="dialog"
-          aria-label="Menu"
-          className={`absolute left-0 top-0 h-full w-[86%] max-w-sm bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
-            menuOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-        >
-          <div className="flex items-center justify-between px-4 h-16 border-b border-gray-100 shrink-0">
-            <Link to="/" className="flex items-center gap-2">
-              <img src={`${ASSETS}/logo-us.png`} alt="" className="h-9 w-9 object-contain" />
-              <span className="text-lg font-bold text-[#0a3d62]">U Seller Store</span>
-            </Link>
-            <button type="button" onClick={() => setMenuOpen(false)} className="p-2 rounded-full hover:bg-gray-100" aria-label="Close menu">
-              <Icon d={ICONS.close} />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-            <SearchForm value={searchQuery} onChange={setSearchQuery} onSubmit={onSearch} inputClassName="py-2.5" />
-
-            <nav className="space-y-1" aria-label="Menu">
-              {NAV_LINKS.map((link) => (
-                <NavLink key={link.to} to={link.to} end={link.end} className={mobileLink}>
-                  {link.label}
-                </NavLink>
-              ))}
-              <NavLink to="/wishlist" className={mobileLink}>
-                <span>Wishlist</span>
-                {wishlistCount > 0 && <span className="text-xs font-bold bg-[#0a3d62] text-white rounded-full px-2 py-0.5">{wishlistCount}</span>}
-              </NavLink>
-              <button
-                type="button"
-                onClick={() => { setMenuOpen(false); openCart() }}
-                className="w-full flex items-center justify-between rounded-xl px-4 py-3 font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
-              >
-                <span>Cart</span>
-                {itemCount > 0 && <span className="text-xs font-bold bg-[#0a3d62] text-white rounded-full px-2 py-0.5">{itemCount}</span>}
-              </button>
-              {isCustomerLoggedIn && (
-                <>
-                  <NavLink to="/orders" className={mobileLink}>My orders</NavLink>
-                  <NavLink to="/profile" className={mobileLink}>My profile</NavLink>
-                </>
-              )}
-            </nav>
-
-            <div className="border-t border-gray-100 pt-5 space-y-3">
-              {isCustomerLoggedIn ? (
-                <>
-                  <p className="px-1 text-sm text-gray-500 truncate">Signed in as <span className="font-semibold text-gray-900">{displayName}</span></p>
-                  <button
-                    type="button"
-                    onClick={onLogout}
-                    className="w-full py-3 rounded-xl border border-rose-200 text-rose-600 font-semibold hover:bg-rose-50 transition-colors"
-                  >
-                    Log out
-                  </button>
-                </>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <Link to="/login" className="py-3 text-center rounded-xl border border-gray-200 font-semibold text-gray-900 hover:bg-gray-50 transition-colors">
-                    Log in
-                  </Link>
-                  <Link to="/signup" className="py-3 text-center rounded-xl bg-[#0a3d62] text-white font-semibold hover:bg-[#0f4c81] transition-colors">
-                    Sign up
-                  </Link>
-                </div>
-              )}
-              <Link to="/seller/signup" className="block text-center text-sm font-semibold text-[#0a3d62] hover:underline">
-                Become a seller
-              </Link>
-            </div>
-          </div>
-        </aside>
-      </div>
     </header>
+
+    {/* Mobile / tablet menu — outside <header> so backdrop-blur doesn't trap the fixed overlay */}
+    <div
+      className={`lg:hidden fixed inset-0 z-[80] ${menuOpen ? '' : 'pointer-events-none'}`}
+      aria-hidden={!menuOpen}
+    >
+      <div
+        onClick={() => setMenuOpen(false)}
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${menuOpen ? 'opacity-100' : 'opacity-0'}`}
+      />
+      <aside
+        role="dialog"
+        aria-label="Menu"
+        className={`absolute left-0 top-0 h-full w-[86%] max-w-sm bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+          menuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between px-4 h-16 border-b border-gray-100 shrink-0">
+          <Link to="/" className="flex items-center gap-2">
+            <img src={`${ASSETS}/logo-us.png`} alt="" className="h-9 w-9 object-contain" />
+            <span className="text-lg font-bold text-[#0a3d62]">U Seller Store</span>
+          </Link>
+          <button type="button" onClick={() => setMenuOpen(false)} className="p-2 rounded-full hover:bg-gray-100" aria-label="Close menu">
+            <Icon d={ICONS.close} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+          <SearchForm value={searchQuery} onChange={setSearchQuery} onSubmit={onSearch} inputClassName="py-2.5" />
+
+          <nav className="space-y-1" aria-label="Menu">
+            {NAV_LINKS.map((link) => (
+              <NavLink key={link.to} to={link.to} end={link.end} className={mobileLink}>
+                {link.label}
+              </NavLink>
+            ))}
+            <NavLink to="/wishlist" className={mobileLink}>
+              <span>Wishlist</span>
+              {wishlistCount > 0 && <span className="text-xs font-bold bg-[#0a3d62] text-white rounded-full px-2 py-0.5">{wishlistCount}</span>}
+            </NavLink>
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); openCart() }}
+              className="w-full flex items-center justify-between rounded-xl px-4 py-3 font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
+            >
+              <span>Cart</span>
+              {itemCount > 0 && <span className="text-xs font-bold bg-[#0a3d62] text-white rounded-full px-2 py-0.5">{itemCount}</span>}
+            </button>
+            {isCustomerLoggedIn && (
+              <>
+                <NavLink to="/orders" className={mobileLink}>My orders</NavLink>
+                <NavLink to="/profile" className={mobileLink}>My profile</NavLink>
+              </>
+            )}
+          </nav>
+
+          <div className="border-t border-gray-100 pt-5 space-y-3">
+            {isCustomerLoggedIn ? (
+              <>
+                <p className="px-1 text-sm text-gray-500 truncate">Signed in as <span className="font-semibold text-gray-900">{displayName}</span></p>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="w-full py-3 rounded-xl border border-rose-200 text-rose-600 font-semibold hover:bg-rose-50 transition-colors"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Link to="/login" className="py-3 text-center rounded-xl border border-gray-200 font-semibold text-gray-900 hover:bg-gray-50 transition-colors">
+                  Log in
+                </Link>
+                <Link to="/signup" className="py-3 text-center rounded-xl bg-[#0a3d62] text-white font-semibold hover:bg-[#0f4c81] transition-colors">
+                  Sign up
+                </Link>
+              </div>
+            )}
+            <Link to="/seller/signup" className="block text-center text-sm font-semibold text-[#0a3d62] hover:underline">
+              Become a seller
+            </Link>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </>
   )
 }
+
 
 export default Navbar

@@ -16,9 +16,9 @@ import {
 } from '../../components/ui'
 
 const StatTile = ({ label, value, tone = 'text-gray-900' }) => (
-  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-    <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-400">{label}</p>
-    <p className={`mt-1 text-xl font-black ${tone}`}>{value}</p>
+  <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400 leading-tight">{label}</p>
+    <p className={`mt-1 text-sm font-black leading-tight break-all ${tone}`}>{value}</p>
   </div>
 )
 

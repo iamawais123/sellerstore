@@ -145,7 +145,7 @@ const PasswordModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
@@ -228,7 +228,7 @@ const NotificationModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="bg-gradient-to-br from-violet-500/10 to-indigo-500/10 p-6 border-b border-gray-100">
           <div className="flex items-start justify-between">
@@ -390,14 +390,14 @@ const ActivityModal = ({ seller, onClose }) => {
   const campaigns = getSellerCampaigns(seller.id)
 
   const statCards = [
-    { key: 'balance', label: 'Shop balance', value: `$${stats.shopBalance.toFixed(2)}`, icon: 'wallet', bg: 'bg-emerald-50', iconBg: 'bg-emerald-100 text-emerald-600' },
+    { key: 'balance', label: 'Shop Balance', value: `$${stats.shopBalance.toFixed(2)}`, icon: 'wallet', bg: 'bg-emerald-50', iconBg: 'bg-emerald-100 text-emerald-600' },
     { key: 'guarantee', label: 'Guarantee', value: `$${stats.guarantee.toFixed(2)}`, icon: 'shield', bg: 'bg-blue-50', iconBg: 'bg-blue-100 text-blue-600' },
-    { key: 'totalViews', label: 'Total views', value: stats.totalViews.toLocaleString(), icon: 'trending', bg: 'bg-violet-50', iconBg: 'bg-violet-100 text-violet-600' },
-    { key: 'orders', label: 'Orders', sub: `${stats.ordersCancelled} cancelled`, value: `${stats.ordersCompleted}/${stats.ordersTotal}`, icon: 'package', bg: 'bg-amber-50', iconBg: 'bg-amber-100 text-amber-600' },
-    { key: 'revenue', label: 'Revenue (compl.)', value: `$${stats.revenue.toFixed(2)}`, icon: 'credit', bg: 'bg-emerald-50', iconBg: 'bg-emerald-100 text-emerald-600' },
-    { key: 'profit', label: 'Profit (completed)', value: `$${stats.profit.toFixed(2)}`, icon: 'trending', bg: 'bg-green-50', iconBg: 'bg-green-100 text-green-600' },
+    { key: 'revenue', label: 'Revenue', sub: 'completed orders', value: `$${stats.revenue.toFixed(2)}`, icon: 'credit', bg: 'bg-teal-50', iconBg: 'bg-teal-100 text-teal-600' },
+    { key: 'profit', label: 'Profit', sub: 'completed orders', value: `$${stats.profit.toFixed(2)}`, icon: 'trending', bg: 'bg-green-50', iconBg: 'bg-green-100 text-green-600' },
     { key: 'withdrawn', label: 'Withdrawn', sub: `${stats.pendingWithdrawals} pending`, value: `$${stats.withdrawn.toFixed(2)}`, icon: 'send', bg: 'bg-indigo-50', iconBg: 'bg-indigo-100 text-indigo-600' },
-    { key: 'todayViews', label: "Today's views", value: stats.todaysViews.toLocaleString(), icon: 'eye', bg: 'bg-purple-50', iconBg: 'bg-purple-100 text-purple-600' },
+    { key: 'orders', label: 'Orders', sub: `${stats.ordersCancelled} cancelled`, value: `${stats.ordersCompleted}/${stats.ordersTotal}`, icon: 'package', bg: 'bg-amber-50', iconBg: 'bg-amber-100 text-amber-600' },
+    { key: 'totalViews', label: 'Total Views', value: stats.totalViews.toLocaleString(), icon: 'trending', bg: 'bg-violet-50', iconBg: 'bg-violet-100 text-violet-600' },
+    { key: 'todayViews', label: "Today's Views", value: stats.todaysViews.toLocaleString(), icon: 'eye', bg: 'bg-purple-50', iconBg: 'bg-purple-100 text-purple-600' },
   ]
 
   const tabs = [
@@ -408,46 +408,46 @@ const ActivityModal = ({ seller, onClose }) => {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="relative bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
-              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur text-white flex items-center justify-center shrink-0">
-                <Icon name="activity" className="w-8 h-8" />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75" onClick={onClose}>
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="relative bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-5 py-4 shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center shrink-0">
+                <Icon name="activity" className="w-5 h-5" />
               </div>
-              <div>
-                <h3 className="text-3xl font-black text-white tracking-tight">{seller.shopName || seller.fullName} — Activity</h3>
-                <p className="text-blue-100 mt-1 font-medium text-lg">Full audit history of this seller account</p>
+              <div className="min-w-0">
+                <h3 className="text-lg font-black text-white leading-tight truncate">{seller.shopName || seller.fullName}</h3>
+                <p className="text-blue-100 text-xs font-semibold">Activity overview</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <span className="inline-flex items-center px-4 py-2 rounded-2xl bg-white/20 backdrop-blur text-white font-black text-sm border border-white/30">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white font-bold text-xs border border-white/30">
                 {seller.status || 'Active'}
               </span>
-              <button onClick={onClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors">
-                <Icon name="close" className="w-6 h-6" />
+              <button onClick={onClose} className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors">
+                <Icon name="close" className="w-4 h-4" />
               </button>
             </div>
           </div>
         </div>
 
-        <div className="p-5">
-          <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="p-4 overflow-y-auto flex-1">
+          <div className="grid grid-cols-2 gap-2.5 mb-5">
             {statCards.map((s) => (
-              <div key={s.key} className="rounded-2xl border-2 border-gray-100 bg-gray-50/50 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0`}>
-                      <Icon name={s.icon} className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-gray-600 truncate">{s.label}</p>
-                      {s.sub && <p className="text-xs text-gray-400 font-medium">{s.sub}</p>}
-                    </div>
+              <div key={s.key} className={`rounded-2xl ${s.bg} p-4`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-8 h-8 rounded-xl ${s.iconBg} flex items-center justify-center`}>
+                    <Icon name={s.icon} className="w-4 h-4" />
                   </div>
-                  <p className="text-2xl font-black text-gray-900 ml-2">{s.value}</p>
+                  {s.sub && (
+                    <span className="text-[10px] text-gray-400 font-bold bg-white/70 px-2 py-0.5 rounded-full leading-tight">
+                      {s.sub}
+                    </span>
+                  )}
                 </div>
+                <p className="text-2xl font-black text-gray-900 leading-none">{s.value}</p>
+                <p className="mt-1.5 text-xs font-bold text-gray-500">{s.label}</p>
               </div>
             ))}
           </div>
@@ -465,7 +465,7 @@ const ActivityModal = ({ seller, onClose }) => {
             ))}
           </div>
 
-          <div className="max-h-[45vh] overflow-y-auto space-y-3 pr-1">
+          <div className="space-y-3 pr-1">
             {tab === 'ledger' && (
               ledger.length === 0 ? (
                 <div className="border-2 border-dashed border-gray-200 rounded-3xl py-16 text-center">
@@ -625,7 +625,7 @@ const LoginHistoryModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-6 border-b border-gray-100">
           <div className="flex items-start space-x-3">
@@ -732,11 +732,8 @@ const BalanceModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
@@ -821,11 +818,8 @@ const GuaranteeModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -915,11 +909,8 @@ const RatingModal = ({ seller, onClose }) => {
   const presets = [5.0, 4.5, 4.0, 3.5, 3.0]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
@@ -1017,11 +1008,8 @@ const ProductLimitModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
             <div className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
@@ -1152,7 +1140,7 @@ const ViewsBoosterModal = ({ seller, onClose }) => {
   const refreshActive = () => setActive(getActiveViewsCampaign(seller.id))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-5 border-b border-gray-100">
           <div className="flex items-start space-x-3">
@@ -1368,11 +1356,8 @@ const SuspendModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
             <div className={`w-14 h-14 rounded-2xl ${isSuspended ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'} flex items-center justify-center shrink-0`}>
@@ -1442,11 +1427,8 @@ const BlockWithdrawalsModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
             <div className={`w-14 h-14 rounded-2xl ${blocked ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0`}>
@@ -1515,11 +1497,8 @@ const AllowProductRemovalModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
             <div className={`w-14 h-14 rounded-2xl ${allowed ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0`}>
@@ -1593,11 +1572,8 @@ const DeleteStoreModal = ({ seller, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-        </div>
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start space-x-3">
             <div className={`w-14 h-14 rounded-2xl ${isDeleted ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0`}>
@@ -1700,6 +1676,7 @@ const AdminSellers = () => {
   const [search, setSearch] = useState(params.get('q') || '')
   const [showDeleted, setShowDeleted] = useState(false)
   const [openMenuFor, setOpenMenuFor] = useState(null)
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
   const [passwordModal, setPasswordModal] = useState(null)
   const [notifModal, setNotifModal] = useState(null)
   const [activityModal, setActivityModal] = useState(null)
@@ -1717,6 +1694,14 @@ const AdminSellers = () => {
   const [loggingInAs, setLoggingInAs] = useState(null)
   const now = useNow(30 * 1000)
 
+  const anyModalOpen = !!(passwordModal || notifModal || activityModal || loginHistoryModal || balanceModal || guaranteeModal || ratingModal || productLimitModal || viewsModal || suspendModal || blockWdModal || allowRemoveModal || deleteModal)
+  useEffect(() => {
+    if (!anyModalOpen) return undefined
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [anyModalOpen])
+
   const menuRef = useRef(null)
   useEffect(() => {
     if (!openMenuFor) return undefined
@@ -1730,6 +1715,14 @@ const AdminSellers = () => {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
     }
+  }, [openMenuFor])
+
+  // Lock body scroll when the mobile bottom sheet is open
+  useEffect(() => {
+    if (!openMenuFor || window.innerWidth >= 640) return undefined
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
   }, [openMenuFor])
 
   const mySellers = sellersRegistry.filter((s) => s.adminId === admin.id)
@@ -1894,10 +1887,16 @@ const AdminSellers = () => {
                       <Icon name="login" className="h-[18px] w-[18px]" />
                       {loggingInAs === s.id ? 'Opening…' : 'Login'}
                     </button>
-                    <div className="relative" ref={menuOpen ? menuRef : undefined}>
+                    <div ref={menuOpen ? menuRef : undefined}>
                       <button
                         type="button"
-                        onClick={() => setOpenMenuFor(menuOpen ? null : s.id)}
+                        onClick={(e) => {
+                          if (!menuOpen) {
+                            const r = e.currentTarget.getBoundingClientRect()
+                            setMenuPos({ top: r.bottom + 8, right: window.innerWidth - r.right })
+                          }
+                          setOpenMenuFor(menuOpen ? null : s.id)
+                        }}
                         aria-label={`Manage ${s.fullName}`}
                         className={`flex h-11 w-11 items-center justify-center rounded-xl border transition ${menuOpen ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
                         aria-expanded={menuOpen}
@@ -1906,35 +1905,58 @@ const AdminSellers = () => {
                         <Icon name="dots" className="h-5 w-5" />
                       </button>
 
-                      {menuOpen && (
-                        <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-[300px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
-                          <ul className="max-h-[70vh] overflow-y-auto py-1.5">
-                            {buildMenu(s).map((entry, idx) => {
-                              if (entry.separator) {
-                                return (
-                                  <li key={'sep-' + idx} role="presentation">
-                                    {idx > 0 && <div className="mx-3 my-1 h-px bg-gray-100" />}
-                                    <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-gray-400">{entry.label}</p>
-                                  </li>
-                                )
-                              }
-                              return (
-                                <li key={entry.id} role="none">
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => handleMenuAction(entry)}
-                                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50 ${entry.color || 'text-gray-700'}`}
-                                  >
-                                    <Icon name={entry.icon} className="h-[18px] w-[18px] shrink-0" />
-                                    <span className="flex-1 text-[15px] font-semibold">{entry.label}</span>
+                      {menuOpen && (() => {
+                        const entries = buildMenu(s)
+                        const renderEntries = (entries) => entries.map((entry, idx) => {
+                          if (entry.separator) return (
+                            <li key={'sep-' + idx} role="presentation">
+                              {idx > 0 && <div className="mx-3 my-1 h-px bg-gray-100" />}
+                              <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-gray-400">{entry.label}</p>
+                            </li>
+                          )
+                          return (
+                            <li key={entry.id} role="none">
+                              <button type="button" role="menuitem" onClick={() => handleMenuAction(entry)} className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50 ${entry.color || 'text-gray-700'}`}>
+                                <Icon name={entry.icon} className="h-[18px] w-[18px] shrink-0" />
+                                <span className="flex-1 text-[15px] font-semibold">{entry.label}</span>
+                              </button>
+                            </li>
+                          )
+                        })
+                        return (
+                          <>
+                            {/* Mobile: full-screen bottom sheet */}
+                            <div className="sm:hidden fixed inset-0 z-[9999] flex flex-col justify-end" onClick={() => setOpenMenuFor(null)}>
+                              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                              <div className="relative bg-white rounded-t-3xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+                                  <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-black shrink-0">
+                                    {(s.fullName || '?')[0].toUpperCase()}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-black text-gray-900 truncate">{s.fullName}</p>
+                                    <p className="text-xs text-gray-500">Account actions</p>
+                                  </div>
+                                  <button onClick={() => setOpenMenuFor(null)} className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                   </button>
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        </div>
-                      )}
+                                </div>
+                                <ul className="max-h-[60vh] overflow-y-auto py-2">
+                                  {renderEntries(entries)}
+                                </ul>
+                                <div className="h-safe-bottom" />
+                              </div>
+                            </div>
+
+                            {/* Desktop: fixed dropdown */}
+                            <div role="menu" style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999 }} className="hidden sm:block w-[280px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
+                              <ul className="max-h-[70vh] overflow-y-auto py-1.5">
+                                {renderEntries(entries)}
+                              </ul>
+                            </div>
+                          </>
+                        )
+                      })()}
                     </div>
                   </div>
 
