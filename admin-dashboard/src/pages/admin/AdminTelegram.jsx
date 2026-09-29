@@ -5,7 +5,7 @@ import { Icon } from '../../components/activity/icons'
 
 // What can be switched on and off, in the order shown. The keys are the ones the relay understands (api/_lib/sync.js).
 const KINDS = [
-  { key: 'activity', title: 'Seller activity', hint: 'New sign-ups, KYC submissions, order payments, withdrawal requests, payout methods and product changes.' },
+  { key: 'activity', title: 'Seller activity', hint: "New sign-ups and KYC resubmissions (with the seller's details and their ID photos and PDFs), order payments, withdrawal requests, payout methods and product changes." },
   { key: 'support', title: 'Support messages', hint: 'A message a seller writes to you in support chat.' },
   { key: 'logins', title: 'Seller sign-ins', hint: 'Every time a seller logs in. Handy, but it can get chatty.' },
 ]
@@ -224,7 +224,7 @@ const AdminTelegram = () => {
       )}
 
       <p className="mt-6 text-xs leading-relaxed text-slate-400">
-        Alerts are short summaries: who did what, and any amount. Telegram bot messages are not end-to-end encrypted, so documents, PINs and passwords are never included. Send /stop to the bot in a private chat to disconnect from Telegram itself.
+        Alerts are short summaries: who did what, and any amount. The exception is a new seller's KYC: their details and ID photos or PDFs are sent too (they come with Seller activity; switch that off to stop them). Telegram bot messages are not end-to-end encrypted, so use a private chat rather than a group for this. Passwords and PINs are never sent. Send /stop to the bot in a private chat to disconnect from Telegram itself.
       </p>
     </div>
   )

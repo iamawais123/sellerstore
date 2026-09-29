@@ -15,7 +15,8 @@
 //
 // A lost ping is harmless: the next one finds everything after the cursor.
 import { composeMessages, renderActivity, renderLogin, renderSupport } from './format.js'
-import { isChatGone } from './telegram.js'
+import { KYC_TYPES, sendKyc } from './kyc.js'
+import { isChatGone, sendStoredFile } from './telegram.js'
 
 export const DEFAULT_PREFS = { activity: true, support: true, logins: false }
 export const PREF_KEYS = Object.keys(DEFAULT_PREFS)
@@ -23,6 +24,10 @@ export const PREF_KEYS = Object.keys(DEFAULT_PREFS)
 const LOOKBACK_MS = 10 * 60 * 1000
 const FETCH_LIMIT = 40
 const REMEMBER = 300
+
+// The ids one record is remembered by. A sign-up or KYC resubmission also brings its KYC package (details and
+// identity documents), which is sent, retried and remembered on its own.
+const idsOf = (source, id, row) => [`${source.key}:${id}`, ...(source.key === 'activity' && KYC_TYPES.has(row.type) ? [`kyc:${id}`] : [])]
 
 const byAdmin = (collection, adminId) => collection.where('adminId', '==', adminId)
 
@@ -63,7 +68,7 @@ const lookbackFrom = (iso) => new Date(Math.max(0, Date.parse(iso) - LOOKBACK_MS
 // out as if new; marked as seen, they never do.
 async function alreadyThere(db, source, adminId, nowIso) {
   const found = await source.query(db.collection(source.collection), adminId, lookbackFrom(nowIso)).get()
-  return found.docs.map((doc) => `${source.key}:${doc.id}`)
+  return found.docs.flatMap((doc) => idsOf(source, doc.id, doc.data()))
 }
 
 // A fresh start for every kind that is switched on: it counts from now, and what is there already is history.
@@ -85,7 +90,7 @@ export async function startCursors(db, adminId, prefs, nowIso) {
 }
 
 // Looks for records newer than the admin's cursors and sends them. `send(chatId, html)` delivers one message.
-export async function syncAdmin({ db, adminId, send, dashboardUrl = '', now = Date.now }) {
+export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, dashboardUrl = '', now = Date.now }) {
   const ref = db.collection('adminTelegram').doc(adminId)
   const snap = await ref.get()
   if (!snap.exists) return { sent: 0 }
@@ -126,6 +131,7 @@ export async function syncAdmin({ db, adminId, send, dashboardUrl = '', now = Da
       // A clock that runs ahead must not push the cursor into the future and hide what comes next.
       newest = later(newest, at > nowIso ? nowIso : at)
       candidates.push({ id: `${source.key}:${doc.id}`, source, row, at })
+      if (idsOf(source, doc.id, row).length > 1) candidates.push({ id: `kyc:${doc.id}`, source, row, at, kyc: true })
     }
     after[source.key] = newest
   }
@@ -147,25 +153,48 @@ export async function syncAdmin({ db, adminId, send, dashboardUrl = '', now = Da
   })
   if (!claimed.length) return { sent: 0 }
 
-  claimed.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
-  const names = await sellerNames(db, claimed.filter((item) => item.source.key === 'logins').map((item) => item.row.sellerId))
-  const items = claimed.map(({ source, row }) =>
-    source.key === 'activity' ? renderActivity(row) : source.key === 'support' ? renderSupport(row) : renderLogin(row, names.get(row.sellerId))
-  )
-
-  try {
-    for (const message of composeMessages(items, { dashboardUrl })) await send(link.chatId, message)
-  } catch (error) {
-    if (isChatGone(error)) {
-      // Blocked the bot or removed it from the group: stop trying, and tell the admin on the page.
-      await ref.update({ enabled: false, lastError: 'Telegram says the bot can no longer message this chat. Connect again to keep getting alerts.', lastErrorAt: nowIso })
-      return { sent: 0 }
-    }
-    await giveBack(db, ref, claimed, before)
-    throw error
+  const alerts = claimed.filter((item) => !item.kyc).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+  const packages = claimed.filter((item) => item.kyc)
+  const gone = async () => {
+    // Blocked the bot or removed it from the group: stop trying, and tell the admin on the page.
+    await ref.update({ enabled: false, lastError: 'Telegram says the bot can no longer message this chat. Connect again to keep getting alerts.', lastErrorAt: nowIso })
+    return { sent: 0 }
   }
+
+  // First the short alerts.
+  if (alerts.length) {
+    const names = await sellerNames(db, alerts.filter((item) => item.source.key === 'logins').map((item) => item.row.sellerId))
+    const items = alerts.map(({ source, row }) =>
+      source.key === 'activity' ? renderActivity(row) : source.key === 'support' ? renderSupport(row) : renderLogin(row, names.get(row.sellerId))
+    )
+    try {
+      for (const message of composeMessages(items, { dashboardUrl })) await send(link.chatId, message)
+    } catch (error) {
+      if (isChatGone(error)) return gone()
+      await giveBack(db, ref, claimed, before)
+      throw error
+    }
+  }
+
+  // Then each new seller's KYC. One that fails is put back on its own, so the alerts above are never sent twice.
+  const failed = []
+  let firstError = null
+  for (const item of packages) {
+    try {
+      await sendKyc({ db, adminId, sellerId: item.row.sellerId, chatId: link.chatId, send, sendFile, dashboardUrl })
+    } catch (error) {
+      if (isChatGone(error)) return gone()
+      failed.push(item)
+      firstError = firstError || error
+    }
+  }
+  if (failed.length) {
+    await giveBack(db, ref, failed, before)
+    throw firstError
+  }
+
   if (link.lastError) await ref.update({ lastError: null, lastErrorAt: null })
-  return { sent: claimed.length }
+  return packages.length ? { sent: alerts.length, kyc: packages.length } : { sent: alerts.length }
 }
 
 // A send that failed for a passing reason: put the records back so the next look sends them.

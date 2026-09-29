@@ -414,3 +414,192 @@ describe('when one kind cannot be read', () => {
     assert.match(sent[1].html, /New message from Sue Shop/)
   })
 })
+
+describe('a new seller\'s KYC', () => {
+  // Tiny stand-ins for what the app stores: a JPEG picture and a PDF, as data URLs.
+  const JPEG = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]).toString('base64')}`
+  const PDF = `data:application/pdf;base64,${Buffer.from('%PDF-1.4 test').toString('base64')}`
+  let files
+  let failFileWith
+
+  const sendFile = async (chatId, dataUrl, options) => {
+    if (failFileWith?.(options)) throw failFileWith(options)
+    files.push({ chatId, dataUrl, ...options })
+    return true
+  }
+  const syncKyc = () => syncAdmin({ db, adminId: 'a1', send, sendFile, now: () => clock })
+
+  const seedSeller = ({ front = JPEG, back = PDF, shop = {}, adminId = 'a1' } = {}) => {
+    db.seed('shops', 's1', {
+      fullName: 'Sue Seller', ownerName: 'Sue Seller', shopName: 'Sue Shop', email: 'sue@x.com', adminId,
+      kyc: { status: 'Pending', docType: 'national-id', country: 'Pakistan', address: 'Street 5, Lahore, Punjab', submittedAt: at(30) },
+      ...shop,
+    })
+    if (front || back) db.seed('kycDocuments', 's1', { sellerId: 's1', adminId, front, back, updatedAt: at(30) })
+  }
+  const signup = (id = 'sign1', extra = {}) =>
+    activity(id, { type: 'seller_signup', title: 'New seller registered', entity: 'Sue Seller', meta: { email: 'sue@x.com', location: 'Lahore, Pakistan' }, ...extra })
+
+  beforeEach(() => {
+    files = []
+    failFileWith = null
+  })
+
+  it('sends the alert, then the details, then the front and back of the ID (a picture and a PDF)', async () => {
+    connect()
+    seedSeller()
+    signup()
+    assert.deepEqual(await syncKyc(), { sent: 1, kyc: 1 })
+
+    assert.equal(sent.length, 2)
+    assert.match(sent[0].html, /New seller registered/)
+    const details = sent[1].html
+    assert.match(details, /KYC to review: Sue Shop/)
+    assert.match(details, /Owner: Sue Seller/)
+    assert.match(details, /Email: sue@x\.com/)
+    assert.match(details, /Country: Pakistan/)
+    assert.match(details, /Address: Street 5, Lahore, Punjab/)
+    assert.match(details, /Document: National ID card/)
+    assert.match(details, /Status: Pending/)
+
+    assert.deepEqual(files.map((f) => [f.name, f.dataUrl === JPEG ? 'jpeg' : f.dataUrl === PDF ? 'pdf' : '?']), [
+      ['kyc-front-sue-shop', 'jpeg'],
+      ['kyc-back-sue-shop', 'pdf'],
+    ])
+    assert.ok(files.every((f) => f.chatId === 4242 && /Sue Shop/.test(f.caption)))
+    assert.match(files[0].caption, /Front/)
+    assert.match(files[1].caption, /Back/)
+  })
+
+  it('sends it once, and again when the seller resubmits', async () => {
+    connect()
+    seedSeller()
+    signup()
+    await syncKyc()
+    assert.deepEqual(await syncKyc(), { sent: 0 })
+    assert.equal(files.length, 2)
+
+    clock += 120_000
+    activity('resub', { type: 'kyc_submitted', title: 'Seller submitted KYC documents', at: at(150) })
+    assert.deepEqual(await syncKyc(), { sent: 1, kyc: 1 })
+    assert.equal(files.length, 4)
+  })
+
+  it('says so when no documents were uploaded', async () => {
+    connect()
+    seedSeller({ front: null, back: null })
+    signup()
+    await syncKyc()
+    assert.match(sent[1].html, /No identity documents were uploaded/)
+    assert.equal(files.length, 0)
+  })
+
+  it('does not treat a sign-up from before it was connected as new', async () => {
+    seedSeller()
+    signup('old', { at: at(30) })
+    // Connecting starts from now; the sign-up above is a minute old and inside the look-back window.
+    const { code } = await createLinkCode({ db, adminId: 'a1', now: () => clock })
+    await consumeLinkCode({ db, code, chat: { id: 4242, type: 'private', first_name: 'Ada' }, now: () => clock })
+    assert.deepEqual(await syncKyc(), { sent: 0 })
+    assert.equal(sent.length, 0)
+    assert.equal(files.length, 0)
+  })
+
+  it('never sends the documents of a seller who belongs to another admin', async () => {
+    connect()
+    seedSeller({ adminId: 'a2' })
+    signup()
+    await syncKyc()
+    assert.equal(sent.filter((m) => /KYC to review/.test(m.html)).length, 0)
+    assert.equal(files.length, 0)
+  })
+
+  it('leaves KYC out when seller activity is switched off', async () => {
+    connect({ prefs: { activity: false, support: true, logins: false }, cursor: { activity: null, support: at(0), logins: null } })
+    seedSeller()
+    signup()
+    assert.deepEqual(await syncKyc(), { sent: 0 })
+    assert.equal(files.length, 0)
+  })
+
+  it('retries just the KYC, without repeating the alert, when a file fails to go', async () => {
+    connect()
+    seedSeller()
+    signup()
+    failFileWith = (options) => (options.name.startsWith('kyc-back') ? Object.assign(new Error('Bad Gateway'), { code: 502 }) : null)
+    await assert.rejects(syncKyc(), /Bad Gateway/)
+    assert.equal(sent.filter((m) => /New seller registered/.test(m.html)).length, 1)
+
+    failFileWith = null
+    assert.deepEqual(await syncKyc(), { sent: 0, kyc: 1 })
+    assert.equal(sent.filter((m) => /New seller registered/.test(m.html)).length, 1, 'the alert is not sent again')
+    assert.equal(files.filter((f) => f.name.startsWith('kyc-back')).length, 1)
+  })
+
+  it('escapes what the seller typed in the details', async () => {
+    connect()
+    seedSeller({ shop: { shopName: '<b>Evil</b> & Co' } })
+    signup()
+    await syncKyc()
+    assert.match(sent[1].html, /&lt;b&gt;Evil&lt;\/b&gt; &amp; Co/)
+  })
+})
+
+describe('uploading a stored picture or PDF to Telegram', () => {
+  const calls = []
+  const realFetch = globalThis.fetch
+  let respond
+
+  beforeEach(() => {
+    calls.length = 0
+    process.env.TELEGRAM_BOT_TOKEN = 'test-token'
+    respond = () => ({ ok: true, result: {} })
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), body: init.body })
+      const answer = respond(String(url))
+      return { status: answer.ok ? 200 : answer.error_code, json: async () => answer }
+    }
+  })
+  afterEach(() => {
+    globalThis.fetch = realFetch
+    delete process.env.TELEGRAM_BOT_TOKEN
+  })
+
+  it('reads the data URLs the apps store', async () => {
+    const { parseDataUrl } = await import('../api/_lib/telegram.js')
+    const parsed = parseDataUrl(`data:image/png;base64,${Buffer.from('abc').toString('base64')}`)
+    assert.equal(parsed.mime, 'image/png')
+    assert.equal(parsed.bytes.toString(), 'abc')
+    assert.equal(parseDataUrl('not a data url'), null)
+    assert.equal(parseDataUrl('data:image/png;base64,'), null)
+  })
+
+  it('sends a picture as a photo and a PDF as a file, as real uploads', async () => {
+    const { sendStoredFile } = await import('../api/_lib/telegram.js')
+    const jpeg = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff]).toString('base64')}`
+    await sendStoredFile(99, jpeg, { name: 'kyc-front', caption: 'Front' })
+    await sendStoredFile(99, `data:application/pdf;base64,${Buffer.from('%PDF').toString('base64')}`, { name: 'kyc-back' })
+
+    assert.match(calls[0].url, /\/bottest-token\/sendPhoto$/)
+    assert.ok(calls[0].body instanceof FormData)
+    assert.equal(calls[0].body.get('chat_id'), '99')
+    assert.equal(calls[0].body.get('caption'), 'Front')
+    assert.equal(calls[0].body.get('photo').name, 'kyc-front.jpg')
+    assert.match(calls[1].url, /\/sendDocument$/)
+    assert.equal(calls[1].body.get('document').name, 'kyc-back.pdf')
+    assert.equal(calls[1].body.get('document').type, 'application/pdf')
+  })
+
+  it('falls back to sending the picture as a file when Telegram will not take it as a photo', async () => {
+    const { sendStoredFile } = await import('../api/_lib/telegram.js')
+    respond = (url) => (url.endsWith('/sendPhoto') ? { ok: false, error_code: 400, description: 'Bad Request: PHOTO_INVALID_DIMENSIONS' } : { ok: true, result: {} })
+    assert.equal(await sendStoredFile(99, `data:image/png;base64,${Buffer.from('x').toString('base64')}`, { name: 'kyc-front' }), true)
+    assert.deepEqual(calls.map((c) => c.url.split('/').pop()), ['sendPhoto', 'sendDocument'])
+  })
+
+  it('sends nothing for something that is not a stored file', async () => {
+    const { sendStoredFile } = await import('../api/_lib/telegram.js')
+    assert.equal(await sendStoredFile(99, undefined), false)
+    assert.equal(calls.length, 0)
+  })
+})
