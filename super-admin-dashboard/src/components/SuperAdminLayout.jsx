@@ -29,7 +29,11 @@ const SuperAdminLayout = () => {
 
   const [titleIcon, title] = pageTitles[location.pathname] || pageTitles['/dashboard']
   const initials = initialsOf(superAdmin.fullName)
-  const inviteLink = `${window.location.origin}/admin-app/login?invite=${superAdmin.inviteCode}`
+  // Admins sign in on the admin domain: when this console is served from superadmin.<domain>, invite
+  // links point at admin.<domain> instead (the invite code is validated against Firestore, so it
+  // doesn't need this console's origin).
+  const adminOrigin = window.location.origin.replace('//superadmin.', '//admin.')
+  const inviteLink = `${adminOrigin}/admin-app/login?invite=${superAdmin.inviteCode}`
 
   const handleStartEdit = () => {
     setInviteDraft(superAdmin.inviteCode)

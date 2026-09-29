@@ -2,6 +2,12 @@
   "installCommand": "npm ci && npm ci --prefix admin-dashboard && npm ci --prefix super-admin-dashboard",
   "buildCommand": "npm run build:all",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/", "has": [{ "type": "host", "value": "^superadmin\\..+$" }], "destination": "/super-admin-app/", "permanent": false },
+    { "source": "/login", "has": [{ "type": "host", "value": "^superadmin\\..+$" }], "destination": "/super-admin-app/login", "permanent": false },
+    { "source": "/", "has": [{ "type": "host", "value": "^admin\\..+$" }], "destination": "/admin-app/", "permanent": false },
+    { "source": "/login", "has": [{ "type": "host", "value": "^admin\\..+$" }], "destination": "/admin-app/login", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/admin-app/:path*", "destination": "/admin-app/index.html" },
     { "source": "/super-admin-app/:path*", "destination": "/super-admin-app/index.html" },
