@@ -35,6 +35,16 @@ const AdminLayout = () => {
   // New sellers waiting for their KYC to be reviewed: badge on the KYC link, and an entry in the bell until decided.
   const pendingKyc = getPendingKYCSellers()
   const bellCount = unreadNotifications.length + pendingKyc.length
+  // Everything waiting for the admin: shown on the menu button (the sidebar is hidden on a phone) and in the tab title.
+  const attention = pendingKyc.length + supportUnread
+
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\)\s*/, '')
+    document.title = attention ? `(${attention}) ${base}` : base
+    return () => {
+      document.title = base
+    }
+  }, [attention])
 
   // Picking a page on a phone should reveal it, not leave the drawer covering it.
   useEffect(() => {
@@ -427,12 +437,14 @@ const AdminLayout = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <button
-                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 text-gray-600"
+                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 text-gray-600 relative"
                 onClick={() => setSidebarOpen(true)}
+                aria-label={attention ? `Menu, ${attention} waiting` : 'Menu'}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
+                {attention > 0 && <span className="absolute top-1 right-1 h-3 w-3 rounded-full bg-red-500 border-2 border-white" />}
               </button>
               {/* Pages with a header of their own (Orders, Sellers) show their title there, not twice. */}
               <div className={`items-center space-x-2 ${ownHeader ? 'hidden' : 'flex'}`}>

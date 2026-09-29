@@ -191,8 +191,11 @@ const AdminDashboard = () => {
           </p>
           <p className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tight mb-2.5 sm:mb-4">{totalSellersCount}</p>
           <button onClick={() => navigate('/kyc')} className="w-full inline-flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border border-amber-100 transition-all group">
-            <span className="text-amber-900 font-bold text-[12px] sm:text-[14.5px]">
+            <span className="flex items-center gap-2 text-amber-900 font-bold text-[12px] sm:text-[14.5px]">
               {pendingKYC} pending KYC
+              {pendingKYC > 0 && (
+                <span className="min-w-[1.5rem] rounded-full bg-red-500 px-2 py-0.5 text-center text-xs font-bold text-white">{pendingKYC > 99 ? '99+' : pendingKYC}</span>
+              )}
             </span>
             <svg className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
