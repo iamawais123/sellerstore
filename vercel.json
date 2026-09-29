@@ -2,6 +2,10 @@
   "installCommand": "npm ci && npm ci --prefix admin-dashboard && npm ci --prefix super-admin-dashboard",
   "buildCommand": "npm run build:all",
   "outputDirectory": "dist",
+  "headers": [
+    { "source": "/admin-app/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/super-admin-app/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
+  ],
   "redirects": [
     { "source": "/", "has": [{ "type": "host", "value": "^superadmin\\..+$" }], "destination": "/super-admin-app/", "permanent": false },
     { "source": "/login", "has": [{ "type": "host", "value": "^superadmin\\..+$" }], "destination": "/super-admin-app/login", "permanent": false },

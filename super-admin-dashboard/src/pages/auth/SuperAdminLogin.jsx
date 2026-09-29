@@ -163,7 +163,7 @@ const SuperAdminLogin = () => {
               )}
 
               <Field label="Email" icon="link">
-                <input type="email" placeholder="superadmin@usellerstore.com" value={form.email} onChange={setField('email')} className={fieldClass} />
+                <input type="email" placeholder="superadmin@vsellerstore.com" value={form.email} onChange={setField('email')} className={fieldClass} />
               </Field>
 
               <Field label="Password" icon="key">

@@ -40,7 +40,7 @@ const Footer = () => {
               <img src={`${ASSETS}/logo-us.png`} alt="" className="h-10 w-10 object-contain" />
               <div>
                 <span className="block text-xl font-bold text-white leading-tight">
-                  U Seller <span className="text-sky-400">Store</span>
+                  Verified Seller <span className="text-sky-400">Store</span>
                 </span>
                 <span className="block text-[11px] sm:text-xs text-gray-400 tracking-widest uppercase mt-0.5">
                   Shop Smarter · Live Better

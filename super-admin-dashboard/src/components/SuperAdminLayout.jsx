@@ -112,7 +112,7 @@ const SuperAdminLayout = () => {
               </div>
               <div className="flex-1 min-w-0 pt-0.5">
                 <p className="font-bold text-gray-900 text-[18px] leading-tight">
-                  U Seller <span className="text-indigo-600">Store</span>
+                  Verified Seller <span className="text-indigo-600">Store</span>
                 </p>
                 <p className="text-[13px] text-gray-500 font-medium">Super Admin Console</p>
               </div>

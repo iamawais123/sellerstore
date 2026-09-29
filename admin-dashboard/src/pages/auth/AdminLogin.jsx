@@ -246,7 +246,7 @@ const AdminLogin = () => {
                   </span>
                   <input
                     type="email"
-                    placeholder="admin@usellerstore.com"
+                    placeholder="admin@vsellerstore.com"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-gray-100 rounded-2xl text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:border-[#1e3a8a] focus:ring-4 focus:ring-indigo-500/10"
