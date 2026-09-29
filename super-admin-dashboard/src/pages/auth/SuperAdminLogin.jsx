@@ -71,7 +71,7 @@ const SuperAdminLogin = () => {
             </div>
             <div>
               <p className="text-xl font-bold">Super Admin Console</p>
-              <p className="text-xs uppercase tracking-widest text-indigo-200 font-semibold">U Seller Store</p>
+              <p className="text-xs uppercase tracking-widest text-indigo-200 font-semibold">Verified Seller Store</p>
             </div>
           </div>
           <div className="inline-flex items-center space-x-2 px-4 py-1.5 bg-white/10 backdrop-blur-sm rounded-full border border-white/15 text-sm font-medium mt-4">

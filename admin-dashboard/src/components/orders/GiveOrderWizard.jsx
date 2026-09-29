@@ -35,21 +35,35 @@ const emptyCustomer = { fullName: '', phone: '', address1: '', address2: '', cit
 
 const STEPS = ['Seller', 'Products', 'Review', 'Customer']
 
+// On mobile this collapses to plain numbered circles joined by lines that share the row's width
+// evenly (so all 4 steps always fit with no horizontal scroll); at sm:+ it's the full labelled pill.
 const Stepper = ({ step }) => (
-  <ol className="flex items-center gap-1 overflow-x-auto" aria-label="Give order steps">
+  <ol className="flex items-center sm:gap-1" aria-label="Give order steps">
     {STEPS.map((label, index) => {
       const number = index + 1
       const done = step > number
       const current = step === number
       return (
-        <li key={label} className="flex shrink-0 items-center gap-1" aria-current={current ? 'step' : undefined}>
-          <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${current ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : done ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
-            <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${current ? 'bg-white/25' : done ? 'bg-indigo-600 text-white' : 'bg-white'}`}>
-              {done ? <Icon name="check" className="h-2.5 w-2.5" strokeWidth={3.5} /> : number}
+        <li key={label} className={`flex items-center ${number < STEPS.length ? 'flex-1 sm:flex-none' : 'shrink-0'}`} aria-current={current ? 'step' : undefined}>
+          <span
+            className={`inline-flex shrink-0 items-center gap-2 rounded-full sm:px-3 sm:py-1.5 sm:text-xs sm:font-bold ${
+              current ? 'sm:bg-indigo-600 sm:text-white sm:shadow-md sm:shadow-indigo-500/30' : done ? 'sm:bg-indigo-50 sm:text-indigo-700' : 'sm:bg-slate-100 sm:text-slate-500'
+            }`}
+          >
+            <span
+              className={`flex h-6 w-6 sm:h-4 sm:w-4 items-center justify-center rounded-full text-[11px] sm:text-[10px] font-bold sm:font-normal ${
+                current
+                  ? 'bg-indigo-600 text-white sm:bg-white/25'
+                  : done
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-200 text-slate-500 sm:bg-white'
+              }`}
+            >
+              {done ? <Icon name="check" className="h-3 w-3 sm:h-2.5 sm:w-2.5" strokeWidth={3.5} /> : number}
             </span>
-            {label}
+            <span className="sr-only sm:not-sr-only sm:inline">{label}</span>
           </span>
-          {number < STEPS.length && <span className={`h-px w-6 sm:w-10 ${done ? 'bg-indigo-300' : 'bg-slate-200'}`} />}
+          {number < STEPS.length && <span className={`mx-1.5 h-px flex-1 sm:mx-0 sm:w-10 sm:flex-none ${done ? 'bg-indigo-300' : 'bg-slate-200'}`} />}
         </li>
       )
     })}
@@ -181,9 +195,12 @@ const ProductsStep = ({ products, selectedItems, onToggle }) => {
   )
 }
 
-const ReviewStep = ({ items, onQtyChange, onRemove, onClearAll }) => {
+const ReviewStep = ({ items, onQtyChange, onRemove, onClearAll, seller }) => {
   const total = items.reduce((sum, item) => sum + item.sell * item.qty, 0)
   const cost = items.reduce((sum, item) => sum + item.cost * item.qty, 0)
+  const hasRatio = seller?.profitRatio != null
+  const itemProfit = (item) => (hasRatio ? money(item.sell * item.qty * seller.profitRatio) : '18–20%')
+  const profitLabel = hasRatio ? money(total * seller.profitRatio) : `${money(total * 0.18)}–${money(total * 0.2)}`
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -214,7 +231,7 @@ const ReviewStep = ({ items, onQtyChange, onRemove, onClearAll }) => {
                 +
               </button>
             </div>
-            <span className="shrink-0 font-black text-indigo-600">+{money((item.sell - item.cost) * item.qty)}</span>
+            <span className="shrink-0 font-black text-indigo-600">{hasRatio ? `+${itemProfit(item)}` : itemProfit(item)}</span>
             <button type="button" onClick={() => onRemove(item.catalogId)} aria-label={`Remove ${decodeEntities(item.name)}`} className="shrink-0 text-slate-300 hover:text-rose-600">
               <Icon name="xCircle" className="h-5 w-5" />
             </button>
@@ -224,7 +241,7 @@ const ReviewStep = ({ items, onQtyChange, onRemove, onClearAll }) => {
       <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4 text-sm font-black">
         <span className="text-slate-800">Order total {money(total)}</span>
         <span className="text-slate-500">Seller pays {money(cost)}</span>
-        <span className="text-indigo-600">Profit {money(total - cost)}</span>
+        <span className="text-indigo-600">Profit {profitLabel}</span>
       </div>
     </div>
   )
@@ -323,7 +340,8 @@ const GiveOrderWizard = ({ verifiedSellers, getSellerSlotInfo, getSellerShopProd
   const products = sellerId ? getSellerShopProductsFull(sellerId) : []
   const seller = verifiedSellers.find((candidate) => candidate.id === sellerId)
   const total = items.reduce((sum, item) => sum + item.sell * item.qty, 0)
-  const profit = items.reduce((sum, item) => sum + (item.sell - item.cost) * item.qty, 0)
+  const hasRatio = seller?.profitRatio != null
+  const profitLabel = hasRatio ? money(total * seller.profitRatio) : `${money(total * 0.18)}–${money(total * 0.2)}`
 
   const scheduledIso = fromLocalInput(scheduledLocal)
   const whenError = timing !== 'scheduled' ? '' : !scheduledIso ? 'Pick a date and time.' : Date.parse(scheduledIso) <= Date.now() ? 'Pick a time in the future.' : ''
@@ -374,7 +392,7 @@ const GiveOrderWizard = ({ verifiedSellers, getSellerSlotInfo, getSellerShopProd
 
       {step === 1 && <SellerStep sellers={verifiedSellers} getSellerSlotInfo={getSellerSlotInfo} onPick={pickSeller} now={now} />}
       {step === 2 && <ProductsStep products={products} selectedItems={items} onToggle={toggleProduct} />}
-      {step === 3 && <ReviewStep items={items} onQtyChange={changeQty} onRemove={removeItem} onClearAll={() => setItems([])} />}
+      {step === 3 && <ReviewStep items={items} onQtyChange={changeQty} onRemove={removeItem} onClearAll={() => setItems([])} seller={seller} />}
       {step === 4 && <CustomerStep customer={customer} setCustomer={setCustomer} timing={timing} setTiming={setTiming} scheduledLocal={scheduledLocal} setScheduledLocal={setScheduledLocal} whenError={whenError} />}
 
       {error && (
@@ -386,7 +404,7 @@ const GiveOrderWizard = ({ verifiedSellers, getSellerSlotInfo, getSellerShopProd
       {step > 1 && (
         <div className="sticky bottom-0 -mx-5 -mb-5 flex items-center justify-between gap-3 rounded-b-3xl border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur lg:-mx-6 lg:-mb-6 lg:px-6">
           <p className="min-w-0 truncate text-xs font-semibold text-slate-500">
-            {items.length ? `${items.length} item${items.length === 1 ? '' : 's'} · ${money(total)} · profit ${money(profit)}` : 'No products selected yet'}
+            {items.length ? `${items.length} item${items.length === 1 ? '' : 's'} · ${money(total)} · profit ${profitLabel}` : 'No products selected yet'}
           </p>
           {step < 4 ? (
             <button type="button" onClick={() => setStep((current) => current + 1)} disabled={!items.length} className="shrink-0 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">

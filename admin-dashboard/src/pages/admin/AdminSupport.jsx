@@ -39,7 +39,17 @@ const usePins = (adminId) => {
 }
 
 const AdminSupport = () => {
-  const { admin, getSupportConversations, getAdminNotifications, sendSupportMessage, markSupportRead, archiveSupportConversation, sellerLoginHistory } = useAuth()
+  const {
+    admin,
+    getSupportConversations,
+    getAdminNotifications,
+    sendSupportMessage,
+    editSupportMessage,
+    unsendSupportMessage,
+    markSupportRead,
+    archiveSupportConversation,
+    sellerLoginHistory,
+  } = useAuth()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [selectedId, setSelectedId] = useState(params.get('c'))
@@ -113,12 +123,12 @@ const AdminSupport = () => {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const send = async () => {
+  const send = async (file) => {
     const body = text.trim()
-    if (!selected || !body || sending) return
+    if (!selected || (!body && !file) || sending) return
     setSending(true)
     setError('')
-    const result = await sendSupportMessage(selected.id, 'admin', body, selected.sellerId)
+    const result = await sendSupportMessage(selected.id, 'admin', body, selected.sellerId, file)
     setSending(false)
     if (result.success) {
       setDrafts((current) => ({ ...current, [selected.id]: '' }))
@@ -126,6 +136,9 @@ const AdminSupport = () => {
       if (selected.status === 'archived') setTab('active')
     } else setError(result.error || 'Your message could not be sent. Please try again.')
   }
+
+  const editMessage = (messageId, newText) => (selected ? editSupportMessage(selected.id, messageId, newText) : Promise.resolve({ success: false }))
+  const unsendMessage = (messageId) => (selected ? unsendSupportMessage(selected.id, messageId) : Promise.resolve({ success: false }))
 
   const toggleArchive = async () => {
     const archived = selected.status === 'archived'
@@ -220,7 +233,7 @@ const AdminSupport = () => {
               </button>
             </div>
 
-            <MessageList items={items} listRef={listRef} />
+            <MessageList items={items} listRef={listRef} onEdit={editMessage} onUnsend={unsendMessage} />
             <Composer
               value={text}
               onChange={(value) => setDrafts((current) => ({ ...current, [selected.id]: value }))}

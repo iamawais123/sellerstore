@@ -144,9 +144,9 @@ const Navbar = () => {
               <Icon d={ICONS.menu} />
             </button>
 
-            <Link to="/" className="flex items-center gap-2 min-w-0" aria-label="U Seller Store home">
+            <Link to="/" className="flex items-center gap-2 min-w-0" aria-label="Verified Seller Store home">
               <img src={`${ASSETS}/logo-us.png`} alt="" className="h-9 w-9 sm:h-10 sm:w-10 object-contain shrink-0" />
-              <span className="text-base sm:text-xl font-bold text-[#0a3d62] truncate">U Seller Store</span>
+              <span className="text-base sm:text-xl font-bold text-[#0a3d62] truncate">Verified Seller Store</span>
             </Link>
 
             <nav className="hidden lg:flex items-center gap-8" aria-label="Main">
@@ -263,7 +263,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between px-4 h-16 border-b border-gray-100 shrink-0">
           <Link to="/" className="flex items-center gap-2">
             <img src={`${ASSETS}/logo-us.png`} alt="" className="h-9 w-9 object-contain" />
-            <span className="text-lg font-bold text-[#0a3d62]">U Seller Store</span>
+            <span className="text-lg font-bold text-[#0a3d62]">Verified Seller Store</span>
           </Link>
           <button type="button" onClick={() => setMenuOpen(false)} className="p-2 rounded-full hover:bg-gray-100" aria-label="Close menu">
             <Icon d={ICONS.close} />

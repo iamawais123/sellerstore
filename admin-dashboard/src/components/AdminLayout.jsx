@@ -24,6 +24,7 @@ const AdminLayout = () => {
   // The mobile drawer only. On desktop (lg+) the sidebar is always shown and the content always makes room for it.
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [inviteError, setInviteError] = useState('')
+  const navRef = useRef(null)
 
   // What sellers wrote in support chat: unread messages badge the Support link, and each message
   // also raises a notification in the bell.
@@ -34,6 +35,7 @@ const AdminLayout = () => {
   // Picking a page on a phone should reveal it, not leave the drawer covering it.
   useEffect(() => {
     setSidebarOpen(false)
+    if (navRef.current) navRef.current.scrollTop = 0
   }, [location.pathname])
 
   useEffect(() => {
@@ -194,20 +196,20 @@ const AdminLayout = () => {
   }
 
   const renderNavGroup = (title, items) => (
-    <div className="mb-6">
+    <div className="mb-3">
       {title && (
-        <p className="px-4 mb-2 text-xs font-bold uppercase tracking-[0.15em] text-gray-400">
+        <p className="px-3.5 mb-1 text-[10.5px] font-bold uppercase tracking-[0.15em] text-gray-400">
           {title}
         </p>
       )}
-      <ul className="space-y-1">
+      <ul className="space-y-0.5">
         {items.map((item) => {
           const isActive = location.pathname === item.to
           return (
             <li key={item.to}>
               <NavLink
                 to={item.to}
-                className={`flex items-center space-x-3.5 px-4 py-3.5 rounded-2xl text-[15px] font-semibold transition-all duration-200 ${
+                className={`flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-[14px] font-semibold transition-all duration-200 ${
                   isActive
                     ? 'bg-indigo-50 text-indigo-700 shadow-sm'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -235,24 +237,24 @@ const AdminLayout = () => {
       )}
 
       <aside
-        className={`w-[280px] bg-white border-r border-gray-100 flex flex-col fixed h-full z-40 shadow-xl lg:shadow-none transform transition-transform duration-300 ${
+        className={`w-[280px] bg-white border-r border-gray-100 flex flex-col fixed inset-y-0 left-0 z-40 shadow-xl lg:shadow-none transform transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="p-5 border-b border-gray-100">
+        <div className="p-3.5 border-b border-gray-100 shrink-0">
           <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#1e3a8a] via-[#2563eb] to-[#3b82f6] flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1e3a8a] via-[#2563eb] to-[#3b82f6] flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <div className="flex-1 min-w-0 pt-0.5">
-                <p className="font-bold text-gray-900 text-[18px] leading-tight">
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-[15px] leading-tight">
                   U Seller{' '}
                   <span className="text-indigo-600">Store</span>
                 </p>
-                <p className="text-[13px] text-gray-500 font-medium">Management Console</p>
+                <p className="text-[11.5px] text-gray-500 font-medium">Management Console</p>
               </div>
             </div>
             <button
@@ -266,24 +268,24 @@ const AdminLayout = () => {
           </div>
         </div>
 
-        <div className="p-5 pb-3">
-          <div className="flex items-center space-x-3">
+        <div className="p-3.5 pb-2 shrink-0">
+          <div className="flex items-center space-x-2.5">
             <div className="relative">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
                 {initials}
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-white" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-gray-900 text-[15px] truncate">{admin.fullName || 'Administrator'}</p>
-              <p className="text-[13px] text-gray-500 font-medium">Administrator</p>
+              <p className="font-bold text-gray-900 text-[13.5px] truncate">{admin.fullName || 'Administrator'}</p>
+              <p className="text-[11.5px] text-gray-500 font-medium">Administrator</p>
             </div>
           </div>
         </div>
 
-        <div className="px-5 pb-5">
-          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-            <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-400 mb-2.5">
+        <div className="px-3.5 pb-3 shrink-0">
+          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 mb-1.5">
               Invite
             </p>
             {!editingInvite ? (
@@ -293,7 +295,7 @@ const AdminLayout = () => {
                 </span>
                 <button
                   onClick={handleCopyInvite}
-                  className={`p-2 rounded-xl transition-all duration-200 ${
+                  className={`p-1.5 rounded-lg transition-all duration-200 ${
                     copied
                       ? 'bg-green-100 text-green-600'
                       : 'bg-white text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200'
@@ -301,30 +303,30 @@ const AdminLayout = () => {
                   title="Copy code"
                 >
                   {copied ? (
-                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
-                    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   )}
                 </button>
                 <button
                   onClick={handleStartEdit}
-                  className="p-2 rounded-xl bg-white text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200 border border-gray-200"
+                  className="p-1.5 rounded-lg bg-white text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200 border border-gray-200"
                   title="Edit code"
                 >
-                  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>
                 </button>
                 <button
                   onClick={handleRegenerate}
-                  className="p-2 rounded-xl bg-white text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200 border border-gray-200"
+                  className="p-1.5 rounded-lg bg-white text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200 border border-gray-200"
                   title="Regenerate code"
                 >
-                  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </button>
@@ -361,17 +363,17 @@ const AdminLayout = () => {
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-2 overflow-y-auto">
+        <nav ref={navRef} className="flex-1 min-h-0 px-2.5 py-1.5 overflow-y-auto">
           {renderNavGroup('Manage', manageItems)}
           {renderNavGroup('Communication', communicationItems)}
           {renderNavGroup('Finance', financeItems)}
           {renderNavGroup('Activity', activityItems)}
         </nav>
 
-        <div className="p-4 border-t border-gray-100">
+        <div className="p-2.5 border-t border-gray-100 shrink-0">
           <button
             onClick={handleSignOut}
-            className="flex items-center space-x-3 w-full px-4 py-3.5 rounded-2xl text-[15px] font-bold text-red-500 hover:bg-red-50 transition-all duration-200"
+            className="flex items-center space-x-3 w-full px-3.5 py-2.5 rounded-xl text-[14px] font-bold text-red-500 hover:bg-red-50 transition-all duration-200"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

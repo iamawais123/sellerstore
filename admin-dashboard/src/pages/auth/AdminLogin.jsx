@@ -126,7 +126,7 @@ const AdminLogin = () => {
             <div>
               <p className="text-xl font-bold">Management Console</p>
               <p className="text-xs uppercase tracking-widest text-indigo-200 font-semibold">
-                U Seller Store
+                Verified Seller Store
               </p>
             </div>
           </div>

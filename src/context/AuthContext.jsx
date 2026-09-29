@@ -19,7 +19,7 @@ import {
   updateSellerDisplayName,
   verifySellerPassword,
 } from '../firebase/accounts'
-import { describeError, fail, getServices } from '../firebase/core'
+import { compressImageToDataUrl, describeError, fail, getServices } from '../firebase/core'
 import * as shopData from '../firebase/shopData'
 
 const AuthContext = createContext(null)
@@ -535,10 +535,19 @@ export function AuthProvider({ children }) {
       notifications.filter((item) => !item.read).map((item) => item.id)
     )
 
-  const sendSupportMessage = async (_conversationId, sender, text) => {
+  const sendSupportMessage = async (_conversationId, sender, text, file) => {
     const problem = needSeller()
     if (problem) return problem
-    return shopData.sendSupportMessage(acting().db, sellerRef.current, sender, text)
+    let attachment
+    if (file) {
+      try {
+        const url = await compressImageToDataUrl(file)
+        attachment = { type: 'image', url, name: file.name || 'photo.jpg', contentType: 'image/jpeg', size: url.length }
+      } catch (error) {
+        return { success: false, error: error.message || 'Could not attach that photo. Please try again.' }
+      }
+    }
+    return shopData.sendSupportMessage(acting().db, sellerRef.current, sender, text, attachment)
   }
 
   const markSupportRead = async (conversationId, role) => {

@@ -1,5 +1,5 @@
 // Master catalog of products every verified seller can pick from to stock their shop.
-// Each entry carries the wholesale cost (what the seller pays U Seller Store) and the
+// Each entry carries the wholesale cost (what the seller pays Verified Seller Store) and the
 // suggested retail sell price shown to the seller's own customers.
 //
 // Kept in lockstep with src/data/masterCatalog.js in the main storefront app (same ids, same

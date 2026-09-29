@@ -136,6 +136,18 @@ export const Icon = ({ name, className = 'w-5 h-5' }) => {
   }
 }
 
+// Marks the owner: the first super admin registered. Only they manage the other super admins, and
+// their account can't be removed or changed by anyone else.
+export const OwnerBadge = ({ className = '' }) => (
+  <span
+    title="Owner — the first registered super admin"
+    className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-0.5 text-[10.5px] font-black text-white shadow-sm shadow-amber-500/30 sm:px-2.5 sm:py-1 sm:text-sm ${className}`}
+  >
+    <Icon name="crown" className="h-3 w-3 sm:h-4 sm:w-4" />
+    Owner
+  </span>
+)
+
 export const Modal = ({ title, subtitle, icon = 'key', iconClass = 'bg-gray-100 text-gray-700', onClose, children, maxWidth = 'max-w-lg' }) => {
   useEffect(() => {
     const onKey = (event) => event.key === 'Escape' && onClose()

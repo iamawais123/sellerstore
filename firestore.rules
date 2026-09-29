@@ -43,15 +43,41 @@ service cloud.firestore {
       return myRole() == 'admin' && me().get('removed', false) != true;
     }
 
-    // The caller is the super admin, or the admin who owns the document's `adminId` (the admin a seller
-    // joined through). These take no argument on purpose: a list query is checked without a concrete
-    // document, and an argument like `resource.data.adminId` would be evaluated *before* the super
-    // admin short-circuit and make an unfiltered super-admin query fail.
+    // The owner is the first super admin ever registered. meta/bootstrap is created once, in the same
+    // batch as that profile, and can never be changed — so ownership can't be handed over, claimed or
+    // forged. Only the owner manages the other super admins (add, remove, restore); nobody, the owner
+    // included, can remove or alter the owner's account through those paths.
+    function ownerUid() { return exists(bootstrapPath()) ? get(bootstrapPath()).data.superAdminUid : ''; }
+    function isOwner() { return isSuperAdmin() && request.auth.uid == ownerUid(); }
+
+    // The owner removing / restoring another super admin: nothing but the removal flags may change.
+    function ownerManagesSuperAdmin(targetUid) {
+      return isOwner()
+        && targetUid != request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['removed', 'removedAt', 'removedBy']);
+    }
+
+    // Every super admin works inside their own branch: the admins who joined through their invite code
+    // (`superAdminId == their uid`), and through those admins the sellers and all the shop data. They
+    // see nothing of any other super admin's branch, the owner's included. Only the owner sees, and
+    // manages, all of it.
+    function ownsAdmin(adminId) {
+      return exists(profilePath(adminId)) && get(profilePath(adminId)).data.get('superAdminId', '') == request.auth.uid;
+    }
+
+    // The caller manages the document: the owner, the super admin the document's `adminId` belongs
+    // to, or that admin. These take no argument on purpose (a list query is checked without a concrete
+    // document); the owner is checked first so their unfiltered queries never reach the `adminId`
+    // lookups, while every other super admin has to pin `adminId` in a list.
     function managesDoc() {
-      return isSuperAdmin() || (isAdmin() && resource.data.adminId == request.auth.uid);
+      return isOwner()
+        || (isSuperAdmin() && ownsAdmin(resource.data.adminId))
+        || (isAdmin() && resource.data.adminId == request.auth.uid);
     }
     function managesNew() {
-      return isSuperAdmin() || (isAdmin() && request.resource.data.adminId == request.auth.uid);
+      return isOwner()
+        || (isSuperAdmin() && ownsAdmin(request.resource.data.adminId))
+        || (isAdmin() && request.resource.data.adminId == request.auth.uid);
     }
 
     // The invite code exists, belongs to `ownerUid` with role `ownerRole`, and hasn't been disabled
@@ -94,21 +120,27 @@ service cloud.firestore {
     }
 
     // Only the very first super admin can self-register: the same batch must create meta/bootstrap,
-    // which can only be created while it doesn't exist yet.
+    // which can only be created while it doesn't exist yet. The owner has no creator (`createdBy` is
+    // null) — that is what tells them apart from every super admin the owner adds later.
     function selfSuperAdmin(d) {
       return d.role == 'superadmin'
         && d.keys().hasOnly(['role', 'fullName', 'email', 'inviteCode', 'memberSince', 'createdAt',
                              'lastLoginAt', 'createdBy', 'removed'])
         && d.keys().hasAll(['role', 'fullName', 'email', 'inviteCode'])
+        && d.get('createdBy', null) == null
         && d.get('removed', false) == false
         && !exists(bootstrapPath())
         && existsAfter(bootstrapPath());
     }
 
-    // Accounts a super admin creates for someone else (admins and further super admins).
+    // Accounts a super admin creates for someone else: admins (under themself) and further super
+    // admins (the owner only, recorded as their creator).
     function provisionedAccount(d) {
       return isSuperAdmin()
         && d.role in ['admin', 'superadmin']
+        && (d.role == 'admin'
+              ? d.get('superAdminId', '') == request.auth.uid
+              : (isOwner() && d.get('createdBy', '') == request.auth.uid))
         && d.keys().hasOnly(['role', 'fullName', 'email', 'inviteCode', 'superAdminId', 'memberSince', 'createdAt',
                              'lastLoginAt', 'createdBy', 'removed'])
         && d.get('removed', false) == false;
@@ -117,17 +149,28 @@ service cloud.firestore {
     // ---- users ---------------------------------------------------------------------------
 
     match /users/{uid} {
-      // Own profile; a super admin reads everyone; an admin reads the sellers who joined through
-      // their invite code and the super admin who invited them.
+      // Own profile. The owner reads everyone. Any other super admin reads only their own branch: the
+      // admins who belong to them and those admins' sellers — never another super admin, and never
+      // anything of another super admin's admins. An admin reads the sellers who joined through their
+      // invite code and the super admin who invited them.
+      function inMyBranch() {
+        return (resource.data.role == 'admin' && resource.data.get('superAdminId', '') == request.auth.uid)
+          || (resource.data.role == 'seller' && ownsAdmin(resource.data.adminId));
+      }
+
       allow get: if signedIn() && (
         request.auth.uid == uid
-        || isSuperAdmin()
+        || isOwner()
+        || (isSuperAdmin() && inMyBranch())
         || (myRole() == 'admin' && (
               (resource.data.role == 'seller' && resource.data.adminId == request.auth.uid)
               || (resource.data.role == 'superadmin' && uid == me().get('superAdminId', '')))));
 
+      // A list has to provably stay inside the branch: a super admin asks for `role == 'admin'` with
+      // `superAdminId == <me>`, or for sellers of one admin (`adminId == <an admin of mine>`).
       allow list: if signedIn() && (
-        isSuperAdmin()
+        isOwner()
+        || (isSuperAdmin() && inMyBranch())
         || (myRole() == 'admin' && resource.data.role == 'seller' && resource.data.adminId == request.auth.uid));
 
       allow create: if signedIn() && (
@@ -141,7 +184,9 @@ service cloud.firestore {
 
       // Owners can touch a few harmless fields (only admins / super admins may change their invite
       // code; `email` may only follow the address Firebase Auth holds for them); role, links between
-      // accounts and `removed` are super-admin territory.
+      // accounts and `removed` are super-admin territory — a super admin manages the admins who belong
+      // to them (and can't hand one to somebody else), the owner manages every admin and the other
+      // super admins, and no one can touch the owner's account.
       allow update: if signedIn() && (
         (request.auth.uid == uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'lastLoginAt', 'inviteCode', 'email'])
@@ -150,8 +195,12 @@ service cloud.firestore {
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email'])
               || request.resource.data.email == request.auth.token.email))
         || (isSuperAdmin()
-          && resource.data.role in ['admin', 'superadmin']
-          && request.resource.data.role == resource.data.role));
+          && request.resource.data.role == resource.data.role
+          && ((resource.data.role == 'admin'
+                && (isOwner()
+                    || (resource.data.get('superAdminId', '') == request.auth.uid
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['superAdminId']))))
+              || (resource.data.role == 'superadmin' && ownerManagesSuperAdmin(uid)))));
 
       allow delete: if false;
     }
@@ -176,11 +225,16 @@ service cloud.firestore {
         && getAfter(profilePath(request.resource.data.ownerUid)).data.fullName == request.resource.data.ownerName
         && getAfter(profilePath(request.resource.data.ownerUid)).data.get('removed', false) != true;
 
-      // Removing / restoring an account disables / re-enables its code.
+      // Removing / restoring an account disables / re-enables its code. A super admin does that for the
+      // codes of their own admins; the owner for any other account's code except their own.
       allow update: if isSuperAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled'])
+        && ((isOwner() && resource.data.ownerUid != request.auth.uid)
+            || (resource.data.ownerRole == 'admin' && ownsAdmin(resource.data.ownerUid)));
 
-      allow delete: if signedIn() && (resource.data.ownerUid == request.auth.uid || isSuperAdmin());
+      allow delete: if signedIn() && (resource.data.ownerUid == request.auth.uid
+                                      || (isSuperAdmin() && resource.data.ownerRole == 'admin'
+                                          && (isOwner() || ownsAdmin(resource.data.ownerUid))));
     }
 
     // ---- bootstrap flag -------------------------------------------------------------------
@@ -308,11 +362,12 @@ service cloud.firestore {
         || (managesDoc()
             && diffKeys().hasOnly(['balance', 'guarantee', 'rating', 'verified', 'status', 'deleted', 'suspended',
                                    'withdrawalsBlocked', 'allowProductRemoval', 'productLimit', 'viewsBoost',
-                                   'orderStats', 'views', 'kyc', 'lastActiveAt', 'kycAckSeen', 'productIds'])
+                                   'orderStats', 'views', 'kyc', 'lastActiveAt', 'kycAckSeen', 'productIds', 'profitRatio'])
             && request.resource.data.balance >= 0
             && request.resource.data.guarantee >= 0
             && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
-            && request.resource.data.productLimit >= 0));
+            && request.resource.data.productLimit >= 0
+            && request.resource.data.get('profitRatio', 0) >= 0 && request.resource.data.get('profitRatio', 0) <= 1));
 
       allow delete: if false;
     }
@@ -568,10 +623,16 @@ service cloud.firestore {
     // ---- super-admin console audit trail ----------------------------------------------------------
 
     match /superAdminLogs/{logId} {
-      allow get, list: if isSuperAdmin();
+      // `superAdminId` is whose console the entry belongs to: the super admin who did it, or the one
+      // whose invite code an admin registered with. Each super admin reads only their own entries (a
+      // list must pin `superAdminId == <me>`); the owner reads them all.
+      allow get, list: if isOwner() || (isSuperAdmin() && resource.data.superAdminId == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['superAdminId', 'actorId', 'actorName', 'type', 'title', 'entity', 'icon', 'at'])
-        && (isSuperAdmin()
+        // A super admin's entries are always written as themself, so nobody can forge activity in the
+        // owner's (or anyone else's) name.
+        && ((isSuperAdmin() && request.resource.data.actorId == request.auth.uid
+                            && request.resource.data.superAdminId == request.auth.uid)
             // An admin registering with a super admin's invite code leaves a note for that super admin.
             || (isAdmin()
                 && request.resource.data.type == 'admin_registered'
@@ -583,11 +644,11 @@ service cloud.firestore {
     // An admin's own sign-ins: when, through what, from which device (`deviceId` is a random id kept in
     // that browser) and from where (`ip`, `location`). A missing place can be filled in later.
     match /adminLoginHistory/{entryId} {
-      allow get, list: if isSuperAdmin() || (isAdmin() && resource.data.adminId == request.auth.uid);
+      allow get, list: if signedIn() && managesDoc();
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['adminId', 'at', 'via', 'ip', 'location', 'device', 'deviceId'])
-        && (isSuperAdmin() || (isAdmin() && request.resource.data.adminId == request.auth.uid));
-      allow update: if (isSuperAdmin() || (isAdmin() && resource.data.adminId == request.auth.uid))
+        && managesNew();
+      allow update: if signedIn() && managesDoc()
         && diffKeys().hasOnly(['location'])
         && request.resource.data.location is string && request.resource.data.location.size() <= 160;
       allow delete: if false;
@@ -595,7 +656,7 @@ service cloud.firestore {
 
     // The names an admin has given their devices in "My Logs": { labels: { <deviceKey>: 'Office PC' } }.
     match /adminDevices/{adminId} {
-      allow get: if signedIn() && (isSuperAdmin() || (isAdmin() && request.auth.uid == adminId));
+      allow get: if signedIn() && (isOwner() || (isSuperAdmin() && ownsAdmin(adminId)) || (isAdmin() && request.auth.uid == adminId));
       allow list: if false;
       allow create, update: if signedIn() && isAdmin() && request.auth.uid == adminId
         && request.resource.data.keys().hasOnly(['adminId', 'labels'])

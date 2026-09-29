@@ -47,13 +47,15 @@ async function rollbackSignUp(auth, user) {
 }
 
 // Registration is open only until the first super admin exists (meta/bootstrap is created by them).
+// That same flag names the owner — the first super admin, who alone manages the others; it is written
+// once and the security rules never let it change.
 export async function getBootstrapState() {
-  if (!isFirebaseConfigured) return { open: false, error: NOT_CONFIGURED_MESSAGE }
+  if (!isFirebaseConfigured) return { open: false, ownerUid: null, error: NOT_CONFIGURED_MESSAGE }
   try {
     const snap = await getDoc(doc(services().db, 'meta', 'bootstrap'))
-    return { open: !snap.exists(), error: '' }
+    return { open: !snap.exists(), ownerUid: snap.exists() ? snap.data().superAdminUid || null : null, error: '' }
   } catch (error) {
-    return { open: false, error: describeError(error) }
+    return { open: false, ownerUid: null, error: describeError(error) }
   }
 }
 
@@ -177,11 +179,19 @@ export function watchOwnProfile(uid, callback) {
   )
 }
 
-// Live list of every admin and super admin.
-export function watchAccounts(callback, onError = () => {}) {
+// Live list of the admins (and, for the owner, the super admins) this console may see.
+//
+// The owner sees every admin and super admin. Any other super admin sees their own branch only — the
+// admins whose `superAdminId` is their uid — and never another super admin or another branch's
+// admins; the security rules refuse any wider query.
+export function watchAccounts(callback, onError = () => {}, { asOwner = true, uid = null } = {}) {
   if (!isFirebaseConfigured) return () => {}
+  const users = collection(services().db, 'users')
+  const q = asOwner
+    ? query(users, where('role', 'in', ['admin', 'superadmin']))
+    : query(users, where('role', '==', 'admin'), where('superAdminId', '==', uid))
   return onSnapshot(
-    query(collection(services().db, 'users'), where('role', 'in', ['admin', 'superadmin'])),
+    q,
     (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     (error) => onError(describeError(error))
   )
@@ -195,7 +205,8 @@ export function updateOwnInviteCode({ uid, fullName, oldCode, rawNewCode }) {
 export const newInviteCode = () => generateUniqueInviteCode(services().db)
 
 // Removing an account blocks its sign-in (profile.removed) and switches its invite code off, so
-// nobody can join through it; restoring reverses both. Nothing is deleted.
+// nobody can join through it; restoring reverses both. Nothing is deleted. (The security rules only
+// let the owner do this to a super admin, and nobody to the owner.)
 export async function setAccountRemoved({ target, removed, actorUid, reassignAdminsTo = null, adminIdsToReassign = [] }) {
   const { db } = services()
   const batch = writeBatch(db)

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useSuperAuth } from '../context/AuthContext'
-import { CopyButton, Icon, initialsOf } from './ui'
+import { CopyButton, Icon, OwnerBadge, initialsOf } from './ui'
 
 const manageItems = [
   { to: '/dashboard', label: 'Dashboard', icon: 'grid' },
@@ -21,7 +21,7 @@ const pageTitles = {
 const SuperAdminLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { superAdmin, logoutSuperAdmin, updateInviteCode, regenerateInviteCode } = useSuperAuth()
+  const { superAdmin, isOwner, logoutSuperAdmin, updateInviteCode, regenerateInviteCode } = useSuperAuth()
   const [editingInvite, setEditingInvite] = useState(false)
   const [inviteDraft, setInviteDraft] = useState('')
   const [inviteError, setInviteError] = useState('')
@@ -129,7 +129,7 @@ const SuperAdminLayout = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-gray-900 text-[15px] truncate">{superAdmin.fullName}</p>
-              <p className="text-[13px] text-gray-500 font-medium">Super Administrator</p>
+              {isOwner ? <OwnerBadge className="mt-0.5" /> : <p className="text-[13px] text-gray-500 font-medium">Super Administrator</p>}
             </div>
           </div>
         </div>

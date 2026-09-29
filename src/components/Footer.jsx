@@ -107,7 +107,7 @@ const Footer = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 text-sm text-gray-400">
             <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-6 gap-y-3">
-              <span>© 2012 U Seller Store. All rights reserved.</span>
+              <span>© 2012 Verified Seller Store. All rights reserved.</span>
               <div className="hidden sm:block h-4 w-px bg-white/10" />
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                 {LEGAL_LINKS.map((item) => (

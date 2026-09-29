@@ -212,7 +212,7 @@ export const mapTimed = (row) => ({ ...row, time: formatDateTime(row.at), device
 
 export const mapConversation = (row) => ({
   ...row,
-  messages: (row.messages || []).map((message) => ({ ...message, time: clockTime(message.at) })),
+  messages: foldSupportMessages(row.messages || []).map((message) => ({ ...message, time: clockTime(message.at) })),
 })
 
 export const sortNewest = (list, field = 'createdAt') => [...list].sort(byNewest(field))
@@ -834,13 +834,39 @@ export const markNotificationsRead = (db, ids) =>
   })
 
 // ---- support chat -------------------------------------------------------------------------------
-// One conversation per seller (id `support-<sellerId>`); messages are only ever appended.
+// One conversation per seller (id `support-<sellerId>`); messages are only ever appended — Firestore
+// rules enforce this (an update must keep the existing array as an exact prefix). An admin's edit or
+// unsend is therefore never a rewrite: it appends a small "supersede" entry (`{ supersedes: <id>, ... }`)
+// that `foldSupportMessages` layers onto the original message when building what the UI shows. The
+// true, original entry is never touched.
 
 export const conversationId = (sellerId) => `support-${sellerId}`
 
 export const WELCOME_MESSAGE = 'Welcome to your store! How can I help you today?'
 
 const preview = (text) => (text.length > 120 ? `${text.slice(0, 117)}…` : text)
+
+// A short label for the notification/preview text of an attachment-only message.
+const attachmentLabel = (attachment) =>
+  !attachment ? '' : attachment.type === 'image' ? '📷 Photo' : attachment.type === 'video' ? '🎥 Video' : `📎 ${attachment.name || 'File'}`
+
+// Replaces each edited/unsent message with its latest state, in its original place in the thread, and
+// drops the supersede entries themselves (they are bookkeeping, never shown as their own bubble).
+// Pure and read-only — the stored `messages` array is never modified by this.
+export const foldSupportMessages = (messages) => {
+  const latestSupersedeFor = new Map()
+  messages.forEach((message) => {
+    if (message.supersedes) latestSupersedeFor.set(message.supersedes, message)
+  })
+  return messages
+    .filter((message) => !message.supersedes)
+    .map((message) => {
+      const edit = latestSupersedeFor.get(message.id)
+      if (!edit) return message
+      if (edit.deleted) return { id: message.id, sender: message.sender, at: message.at, deleted: true }
+      return { ...message, text: edit.text, editedAt: edit.at }
+    })
+}
 
 // The note the other side gets for a chat message (type `chat`): a seller's message notifies their
 // admin (`recipient: 'admin'`), the admin's reply notifies the seller. Best effort — a failed note
@@ -883,11 +909,16 @@ export const createWelcomeConversation = (db, shop) =>
     return { success: true }
   })
 
-export const sendSupportMessage = (db, shop, sender, text) =>
+// `attachment`, when given, is `{ type: 'image', url, name, contentType, size }` where `url` is a
+// compressed `data:` URL (see `compressImageToDataUrl` in core.js — no Cloud Storage, so the photo
+// itself lives right here in the message, kept deliberately small: every message ever sent in this
+// conversation, attachments included, shares the same ~1MB document). A message needs text or an
+// attachment, not necessarily both (a photo can stand on its own).
+export const sendSupportMessage = (db, shop, sender, text, attachment) =>
   attempt(async () => {
     const body = (text || '').trim()
-    if (!body) return { success: false, error: 'Message cannot be empty' }
-    const message = { id: newId('message'), sender, text: body, at: nowIso() }
+    if (!body && !attachment) return { success: false, error: 'Message cannot be empty' }
+    const message = clean({ id: newId('message'), sender, text: body, attachment, at: nowIso() })
     await setDoc(
       doc(db, COL.support, conversationId(shop.id)),
       {
@@ -901,7 +932,37 @@ export const sendSupportMessage = (db, shop, sender, text) =>
       },
       { merge: true }
     )
-    await pushChatNotification(db, shop, sender, body)
+    await pushChatNotification(db, shop, sender, body || attachmentLabel(attachment))
+    return { success: true }
+  })
+
+// Admin-only: fixes the text of one of the admin's own messages (see the file header — this appends
+// a supersede entry rather than rewriting the original). Sellers never get this in the UI, and editing
+// a message that isn't the admin's own, or is already unsent, does nothing useful, so callers should
+// only offer it on the admin's own, still-live messages.
+export const editSupportMessage = (db, shop, messageId, newText) =>
+  attempt(async () => {
+    const body = (newText || '').trim()
+    if (!body) return { success: false, error: 'Message cannot be empty' }
+    const at = nowIso()
+    await setDoc(
+      doc(db, COL.support, conversationId(shop.id)),
+      { updatedAt: at, messages: arrayUnion({ id: newId('message'), sender: 'admin', supersedes: messageId, text: body, at }) },
+      { merge: true }
+    )
+    return { success: true }
+  })
+
+// Admin-only "unsend": the original text/attachment stop showing (replaced with a placeholder) but
+// the message keeps its place in the thread. Same supersede mechanism as editing.
+export const deleteSupportMessage = (db, shop, messageId) =>
+  attempt(async () => {
+    const at = nowIso()
+    await setDoc(
+      doc(db, COL.support, conversationId(shop.id)),
+      { updatedAt: at, messages: arrayUnion({ id: newId('message'), sender: 'admin', supersedes: messageId, deleted: true, at }) },
+      { merge: true }
+    )
     return { success: true }
   })
 
@@ -1015,6 +1076,19 @@ export const setProductLimit = (db, target, value, actorId) =>
     return { success: true, newLimit: limit }
   })
 
+// The share of each order's sale value this seller keeps as profit (0 to 1), set by the admin. Orders
+// created after this is set lock in the ratio at creation time; earlier orders keep whatever profit
+// they were already given. A seller with no ratio set falls back to the catalogue's markup (see
+// `computeOrderTotals`).
+export const setProfitRatio = (db, target, value, actorId) =>
+  attempt(async () => {
+    const ratio = parseFloat(value)
+    if (Number.isNaN(ratio) || ratio < 0 || ratio > 1) return { success: false, error: 'Profit ratio must be between 0% and 100%' }
+    const rounded = Math.round(ratio * 10000) / 10000
+    await editShop(db, target, { profitRatio: rounded }, { type: 'seller_profit_ratio', title: `Profit ratio set to ${Math.round(rounded * 100)}%`, icon: 'trending' }, actorId)
+    return { success: true, newRatio: rounded }
+  })
+
 export const setSuspended = (db, target, suspended, actorId) =>
   attempt(async () => {
     const status = suspended ? 'Suspended' : target.status === 'Suspended' ? 'Active' : target.status
@@ -1120,10 +1194,20 @@ export const sendNotification = (db, target, notification, actorId) =>
 
 // ---- admin: orders ----------------------------------------------------------------------------------
 
-export const computeOrderTotals = (items) => {
+// A seller with no ratio set gets a random share of that product's sale value instead, rolled fresh
+// for each product (not once for the whole order) so a multi-item order isn't all-or-nothing on a
+// single roll.
+const randomFallbackRatio = () => 0.18 + Math.random() * 0.02
+
+// `profitRatio` (0 to 1), when the seller has one set by the admin, decides the seller's profit as
+// that share of each product's own sale value (qty × sell), summed across the order — not the
+// order's total cost. A seller with no ratio set instead gets a random 18%-20% share per product
+// (see `randomFallbackRatio`); the admin can raise it any time from Sellers → ⋮ → Profit Ratio.
+export const computeOrderTotals = (items, profitRatio) => {
   const total = items.reduce((sum, item) => sum + item.sell * item.qty, 0)
   const cost = items.reduce((sum, item) => sum + item.cost * item.qty, 0)
-  return { total: round2(total), cost: round2(cost), profit: round2(total - cost) }
+  const profit = items.reduce((sum, item) => sum + item.sell * item.qty * (profitRatio != null ? profitRatio : randomFallbackRatio()), 0)
+  return { total: round2(total), cost: round2(cost), profit: round2(profit) }
 }
 
 // What an order is made of, checked and shaped: `{ error }` when it cannot be given, else
@@ -1143,7 +1227,7 @@ function orderContents(target, { items, customer } = {}) {
       sell: item.sell,
     })
   )
-  const { total, cost, profit } = computeOrderTotals(normalizedItems)
+  const { total, cost, profit } = computeOrderTotals(normalizedItems, target.profitRatio)
   return { items: normalizedItems, customer: customer || {}, total, cost, profit, qty: normalizedItems.reduce((sum, item) => sum + item.qty, 0) }
 }
 

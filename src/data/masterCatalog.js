@@ -1,5 +1,5 @@
 // Master catalog of products every verified seller can pick from to stock their shop.
-// Each entry carries the wholesale cost (what the seller pays U Seller Store) and the
+// Each entry carries the wholesale cost (what the seller pays Verified Seller Store) and the
 // suggested retail sell price shown to the seller's own customers.
 //
 // Once a seller's KYC is approved they can add any of these to their shop; the admin

@@ -19,13 +19,26 @@ const PATHS = {
   info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
   x: 'M6 18L18 6M6 6l12 12',
   chat: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+  paperclip: 'M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48',
+  camera: ['M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h3.5l1.7-2.4A1 1 0 019 3h6a1 1 0 01.8.4L17.5 6H21a2 2 0 012 2z', 'M12 17a4 4 0 100-8 4 4 0 000 8z'],
+  edit: 'M11 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+  trash: ['M3 6h18', 'M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z'],
+  file: ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2v6h6'],
+  play: 'M5 3l14 9-14 9V3z',
+  download: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
 }
 
-export const Icon = ({ name, className = 'h-5 w-5', strokeWidth = 1.8, filled = false }) => (
-  <svg className={className} fill={filled ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d={PATHS[name] || PATHS.chat} />
-  </svg>
-)
+export const Icon = ({ name, className = 'h-5 w-5', strokeWidth = 1.8, filled = false }) => {
+  const value = PATHS[name] || PATHS.chat
+  const paths = Array.isArray(value) ? value : [value]
+  return (
+    <svg className={className} fill={filled ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      {paths.map((d, index) => (
+        <path key={index} strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d={d} />
+      ))}
+    </svg>
+  )
+}
 
 // Delivered (one tick) and read (two ticks) marks under a message the admin sent.
 export const Ticks = ({ read, className = 'h-3.5 w-3.5' }) => (

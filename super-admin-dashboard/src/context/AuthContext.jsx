@@ -20,6 +20,7 @@ import {
 } from '../firebase/accounts'
 import { describeError, getServices } from '../firebase/core'
 import * as shopData from '../firebase/shopData'
+import { newestFirst, watchForAdmins, watchWithIndexFallback } from '../firebase/scoped'
 
 // Everything here is live from Firebase: accounts (Auth + Firestore `users`) and the shop data the
 // admins' networks produce (sellers, orders, withdrawals, activity), which this console only reads.
@@ -32,6 +33,15 @@ const KEYS = {
 }
 
 const EMPTY_LIST = []
+
+const newest = (count) => [shopData.orderBy('at', 'desc'), shopData.limit(count)]
+
+// Shows a failed live query on the page (and in the console) instead of throwing.
+const logDataError = (setDataError) => (error, name) => {
+  // eslint-disable-next-line no-console
+  console.error(`[super admin data] ${name}:`, error)
+  setDataError(describeError(error))
+}
 
 const AuthContext = createContext(null)
 
@@ -76,10 +86,13 @@ export function SuperAuthProvider({ children }) {
   const [ownProfile, setOwnProfile] = useState({ uid: null, profile: null })
   const profile = ownProfile.uid === authUid ? ownProfile.profile : null
   const profileReady = !authUid || ownProfile.uid === authUid
-  const [accounts, setAccounts] = useState({ superAdmins: EMPTY_LIST, admins: EMPTY_LIST, ready: false, error: '' })
+  const [accounts, setAccounts] = useState({ superAdmins: EMPTY_LIST, removedSuperAdmins: EMPTY_LIST, admins: EMPTY_LIST, ready: false, error: '' })
+  // `ownerUid` is the first super admin ever registered (see meta/bootstrap): the one account that
+  // manages the other super admins and that nobody else can remove. It never changes once set.
   const [bootstrap, setBootstrap] = useState({
     checked: !isFirebaseConfigured,
     open: false,
+    ownerUid: null,
     error: isFirebaseConfigured ? '' : NOT_CONFIGURED_MESSAGE,
   })
 
@@ -107,7 +120,7 @@ export function SuperAuthProvider({ children }) {
   useEffect(() => {
     let cancelled = false
     getBootstrapState().then((state) => {
-      if (!cancelled) setBootstrap({ checked: true, open: state.open, error: state.error })
+      if (!cancelled) setBootstrap({ checked: true, open: state.open, ownerUid: state.ownerUid, error: state.error })
     })
     return () => {
       cancelled = true
@@ -131,25 +144,64 @@ export function SuperAuthProvider({ children }) {
 
   const superAdmin = profile
   const superAdminId = profile?.id || null
+  const { ownerUid } = bootstrap
+  const isOwner = !!superAdminId && superAdminId === ownerUid
+  const isOwnerId = (id) => !!id && id === ownerUid
 
-  // Every admin and super admin, live.
+  // If the first bootstrap read failed (offline, a slow start), look up the owner again once a super
+  // admin is signed in, so the console never sits there not knowing who the owner is. Only the owner
+  // is filled in — `open` (whether registration is still allowed) is never touched here.
+  useEffect(() => {
+    if (!superAdminId || bootstrap.ownerUid) return undefined
+    let cancelled = false
+    getBootstrapState().then((state) => {
+      if (!cancelled && state.ownerUid) setBootstrap((prev) => ({ ...prev, ownerUid: state.ownerUid }))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [superAdminId, bootstrap.ownerUid])
+
+  // The accounts this console may see, live. The owner sees every admin and super admin. Any other super
+  // admin works inside their own branch: the admins who belong to them, and nobody else — no other super
+  // admin, no other branch's admins. What a query may ask for depends on who is asking, so this waits
+  // until the owner is known.
   useEffect(() => {
     if (!superAdminId) {
-      setAccounts({ superAdmins: EMPTY_LIST, admins: EMPTY_LIST, ready: false, error: '' })
+      setAccounts({ superAdmins: EMPTY_LIST, removedSuperAdmins: EMPTY_LIST, admins: EMPTY_LIST, ready: false, error: '' })
+      return undefined
+    }
+    if (!ownerUid) {
+      const error = bootstrap.error || 'Could not tell who owns this console. Reload the page to try again.'
+      setAccounts((prev) => (bootstrap.checked ? { ...prev, ready: true, error } : prev))
       return undefined
     }
     return watchAccounts(
       (rows) => {
         const superAdmins = rows.filter((r) => r.role === 'superadmin' && !r.removed)
+        const removedSuperAdmins = rows.filter((r) => r.role === 'superadmin' && r.removed)
         const admins = rows.filter((r) => r.role === 'admin')
-        setAccounts({ superAdmins, admins, ready: true, error: '' })
+        setAccounts({ superAdmins, removedSuperAdmins, admins, ready: true, error: '' })
       },
-      (error) => setAccounts((prev) => ({ ...prev, ready: true, error }))
+      (error) => setAccounts((prev) => ({ ...prev, ready: true, error })),
+      { asOwner: superAdminId === ownerUid, uid: superAdminId }
     )
-  }, [superAdminId])
+  }, [superAdminId, ownerUid, bootstrap.checked, bootstrap.error])
 
-  // The whole network, live: every seller shop, order and withdrawal, plus the activity feeds. Only
-  // a super admin can read across admins (see firestore.rules).
+  const { admins } = accounts
+  // Only the owner ever has other super admins to list; everyone else sees just themself.
+  const superAdmins = useMemo(() => (isOwner ? accounts.superAdmins : superAdmin ? [superAdmin] : EMPTY_LIST), [isOwner, accounts.superAdmins, superAdmin])
+  const removedSuperAdmins = isOwner ? accounts.removedSuperAdmins : EMPTY_LIST
+  // The ids of the admins in a non-owner's branch: everything below is read for those admins only.
+  const myAdminIds = isOwner
+    ? ''
+    : admins
+        .map((a) => a.id)
+        .sort()
+        .join(',')
+
+  // The network, live: shops, orders and withdrawals, plus the activity feeds. The owner reads it all;
+  // every other super admin reads only what belongs to their own admins (see firestore.rules).
   const [network, setNetwork] = useState({ sellers: EMPTY_LIST, orders: EMPTY_LIST, withdrawals: EMPTY_LIST })
   const [networkLogs, setNetworkLogs] = useState(EMPTY_LIST)
   const [superLogs, setSuperLogs] = useState(EMPTY_LIST)
@@ -157,42 +209,82 @@ export function SuperAuthProvider({ children }) {
   const [dataError, setDataError] = useState('')
 
   useEffect(() => {
-    if (!superAdminId) {
+    if (!superAdminId || !accounts.ready || !ownerUid) {
       setNetwork({ sellers: EMPTY_LIST, orders: EMPTY_LIST, withdrawals: EMPTY_LIST })
       setNetworkLogs(EMPTY_LIST)
-      setSuperLogs(EMPTY_LIST)
       setAdminLogins(EMPTY_LIST)
       return undefined
     }
     const { db } = getServices(SUPER_APP)
     setDataError('')
-    const onError = (error, name) => {
-      // eslint-disable-next-line no-console
-      console.error(`[super admin data] ${name}:`, error)
-      setDataError(describeError(error))
+    const onError = logDataError(setDataError)
+    const setNetworkPart = (key) => (rows) => setNetwork((prev) => ({ ...prev, [key]: rows }))
+    let unsubscribers
+    if (isOwner) {
+      unsubscribers = [
+        shopData.watchList(db, shopData.COL.shops, [], setNetworkPart('sellers'), onError, shopData.mapShop),
+        shopData.watchList(db, shopData.COL.orders, [], setNetworkPart('orders'), onError),
+        shopData.watchList(db, shopData.COL.withdrawals, [], setNetworkPart('withdrawals'), onError),
+        shopData.watchList(db, shopData.COL.activity, newest(200), setNetworkLogs, onError, shopData.mapLog),
+        shopData.watchList(db, shopData.COL.adminLogins, newest(500), setAdminLogins, onError),
+      ]
+    } else {
+      const adminIds = myAdminIds ? myAdminIds.split(',') : []
+      const forMyAdmins = (name, onData, options) => watchForAdmins(db, name, adminIds, options, onData, onError)
+      unsubscribers = [
+        forMyAdmins(shopData.COL.shops, setNetworkPart('sellers'), { map: shopData.mapShop }),
+        forMyAdmins(shopData.COL.orders, setNetworkPart('orders')),
+        forMyAdmins(shopData.COL.withdrawals, setNetworkPart('withdrawals')),
+        forMyAdmins(shopData.COL.activity, setNetworkLogs, { map: shopData.mapLog, newest: { field: 'at', count: 200 } }),
+        forMyAdmins(shopData.COL.adminLogins, setAdminLogins, { newest: { field: 'at', count: 500 } }),
+      ]
     }
-    const newest = (count) => [shopData.orderBy('at', 'desc'), shopData.limit(count)]
-    const unsubscribers = [
-      shopData.watchList(db, shopData.COL.shops, [], (rows) => setNetwork((prev) => ({ ...prev, sellers: rows })), onError, shopData.mapShop),
-      shopData.watchList(db, shopData.COL.orders, [], (rows) => setNetwork((prev) => ({ ...prev, orders: rows })), onError),
-      shopData.watchList(db, shopData.COL.withdrawals, [], (rows) => setNetwork((prev) => ({ ...prev, withdrawals: rows })), onError),
-      shopData.watchList(db, shopData.COL.activity, newest(200), setNetworkLogs, onError, shopData.mapLog),
-      shopData.watchList(db, shopData.COL.superLogs, newest(200), setSuperLogs, onError),
-      shopData.watchList(db, shopData.COL.adminLogins, newest(500), setAdminLogins, onError),
-    ]
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe())
-  }, [superAdminId])
+  }, [superAdminId, accounts.ready, ownerUid, isOwner, myAdminIds])
 
+  // The super admin audit trail. Each super admin reads only their own entries (including the notes left
+  // when an admin registers with their invite code); the owner reads them all.
+  useEffect(() => {
+    if (!superAdminId || !accounts.ready || !ownerUid) {
+      setSuperLogs(EMPTY_LIST)
+      return undefined
+    }
+    const { db } = getServices(SUPER_APP)
+    const onError = logDataError(setDataError)
+    if (isOwner) return shopData.watchList(db, shopData.COL.superLogs, newest(200), setSuperLogs, onError)
+    // Filtered by super admin and sorted by time: that needs a composite index (firestore.indexes.json).
+    // If it has not been deployed yet, filter alone and sort here, so the log is never empty for lack of it.
+    return watchWithIndexFallback(
+      (indexed, onLogError) =>
+        shopData.watchList(
+          db,
+          shopData.COL.superLogs,
+          [shopData.where('superAdminId', '==', superAdminId), ...(indexed ? newest(200) : [])],
+          (rows) => setSuperLogs(indexed ? rows : newestFirst(rows, 'at', 200)),
+          onLogError
+        ),
+      onError
+    )
+  }, [superAdminId, accounts.ready, ownerUid, isOwner])
+
+  // Admin sign-ins, grouped by admin. A "log in as admin" is recorded as "Super admin: <name>". Someone
+  // else's — the owner signing in as one of your admins — would reveal who they are and what they did,
+  // so outside the owner's own view only the entries made by you are kept.
+  const myName = superAdmin?.fullName
   const adminLoginHistory = useMemo(
     () =>
-      adminLogins.reduce((byAdmin, entry) => {
-        ;(byAdmin[entry.adminId] ||= []).push(entry)
-        return byAdmin
-      }, {}),
-    [adminLogins]
+      adminLogins
+        .filter((entry) => {
+          const asSuperAdmin = /^Super admin: (.*)$/.exec(entry.via || '')
+          return isOwner || !asSuperAdmin || asSuperAdmin[1] === myName
+        })
+        .reduce((byAdmin, entry) => {
+          ;(byAdmin[entry.adminId] ||= []).push(entry)
+          return byAdmin
+        }, {}),
+    [adminLogins, isOwner, myName]
   )
 
-  const { superAdmins, admins } = accounts
   const loading = !authReady || (!!authUid && !profileReady) || (!!superAdminId && !accounts.ready)
 
   // Best effort: a failed log line never fails the action it describes.
@@ -217,7 +309,7 @@ export function SuperAuthProvider({ children }) {
       const result = await registerSuperAdminAccount(fields)
       if (!result.success) return result
       setOwnProfile({ uid: result.user.uid, profile: result.profile })
-      setBootstrap((prev) => ({ ...prev, open: false }))
+      setBootstrap((prev) => ({ ...prev, open: false, ownerUid: result.user.uid }))
       pushLog({ type: 'super_admin_registered', title: 'Super admin account created', entity: result.profile.fullName, icon: 'crown' }, result.profile)
       return { success: true }
     })
@@ -228,6 +320,7 @@ export function SuperAuthProvider({ children }) {
       const result = await signInSuperAdminAccount({ email, password, remember })
       if (!result.success) return result
       setOwnProfile({ uid: result.user.uid, profile: result.profile })
+      pushLog({ type: 'super_admin_login', title: 'Signed in', entity: result.profile.fullName, icon: 'signin' }, result.profile)
       return { success: true }
     })
 
@@ -263,8 +356,11 @@ export function SuperAuthProvider({ children }) {
     return result
   }
 
+  // Only the owner — the first super admin — adds, removes and restores super admins. The security
+  // rules enforce this; the checks here just fail fast with a readable reason.
   const createSuperAdmin = async (fields) => {
     if (!superAdmin) return { success: false, error: 'Not logged in' }
+    if (!isOwner) return { success: false, error: 'Only the owner can add super admins.' }
     const problem = validateAccountFields(fields)
     if (problem) return { success: false, error: problem }
     const result = await provisionAccount({ role: 'superadmin', ...fields, createdBy: superAdmin.id })
@@ -277,6 +373,8 @@ export function SuperAuthProvider({ children }) {
   // no admin is ever left without an owner.
   const removeSuperAdmin = async (targetId) => {
     if (!superAdmin) return { success: false, error: 'Not logged in' }
+    if (isOwnerId(targetId)) return { success: false, error: 'The owner is the first super admin and cannot be removed.' }
+    if (!isOwner) return { success: false, error: 'Only the owner can remove super admins.' }
     if (targetId === superAdmin.id) return { success: false, error: 'You cannot remove your own super admin account.' }
     const target = superAdmins.find((s) => s.id === targetId)
     if (!target) return { success: false, error: 'Super admin not found' }
@@ -296,6 +394,19 @@ export function SuperAuthProvider({ children }) {
       icon: 'trash',
     })
     return { success: true, transferred: adminIds.length }
+  }
+
+  // Brings a removed super admin back (sign-in and invite code both). The admins that were handed to
+  // the owner when they were removed stay with the owner.
+  const restoreSuperAdmin = async (targetId) => {
+    if (!superAdmin) return { success: false, error: 'Not logged in' }
+    if (!isOwner) return { success: false, error: 'Only the owner can restore super admins.' }
+    const target = removedSuperAdmins.find((s) => s.id === targetId)
+    if (!target) return { success: false, error: 'Super admin not found' }
+    const result = await setAccountRemoved({ target, removed: false, actorUid: superAdmin.id })
+    if (!result.success) return result
+    pushLog({ type: 'super_admin_restored', title: 'Super admin restored', entity: target.fullName, icon: 'shield' })
+    return { success: true }
   }
 
   // ---- Admin accounts ------------------------------------------------------------------------
@@ -335,8 +446,10 @@ export function SuperAuthProvider({ children }) {
     return { success: true }
   }
 
+  // Admins belong to the super admin they registered with; only the owner can move one to themself.
   const assignAdminToMe = async (adminId) => {
     if (!superAdmin) return { success: false, error: 'Not logged in' }
+    if (!isOwner) return { success: false, error: 'Only the owner can reassign admins.' }
     const target = admins.find((a) => a.id === adminId)
     if (!target) return { success: false, error: 'Admin not found' }
     const result = await assignAdmin(adminId, superAdmin.id)
@@ -374,6 +487,14 @@ export function SuperAuthProvider({ children }) {
 
   const getSuperAdminById = (id) => superAdmins.find((s) => s.id === id) || null
 
+  // How a super admin is named around the console: "You", the person's name (owner only — everyone else
+  // never has another super admin in view), or null when there is no such active super admin.
+  const superAdminName = (id) => {
+    if (!id) return null
+    if (id === superAdminId) return 'You'
+    return getSuperAdminById(id)?.fullName || null
+  }
+
   const getAdminLoginHistory = (adminId) => adminLoginHistory[adminId] || EMPTY_LIST
 
   const getAdminStats = (adminId) => {
@@ -408,7 +529,11 @@ export function SuperAuthProvider({ children }) {
     accountsError: accounts.error,
     dataError,
     canRegisterSuperAdmin,
+    ownerUid,
+    isOwner,
+    isOwnerId,
     superAdmins,
+    removedSuperAdmins,
     admins,
     superLogs,
     networkLogs,
@@ -420,12 +545,14 @@ export function SuperAuthProvider({ children }) {
     changeOwnPassword,
     createSuperAdmin,
     removeSuperAdmin,
+    restoreSuperAdmin,
     addAdmin,
     setAdminRemoved,
     resetAdminPassword,
     assignAdminToMe,
     loginAsAdmin,
     getSuperAdminById,
+    superAdminName,
     getAdminLoginHistory,
     getAdminStats,
     generatePassword: generateStrongPassword,

@@ -27,6 +27,8 @@ async function seed() {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const s = ctx.firestore()
     await setDoc(doc(s, 'users/sa1'), SUPER)
+    // sa1 is the first super admin ever registered — the owner — as in any real project.
+    await setDoc(doc(s, 'meta/bootstrap'), { superAdminUid: 'sa1', createdAt: now })
     await setDoc(doc(s, 'users/a1'), adminProfile('a1'))
     await setDoc(doc(s, 'users/a2'), adminProfile('a2'))
     await setDoc(doc(s, 'users/s1'), sellerProfile('s1', 'a1'))
@@ -44,7 +46,9 @@ before(async () => {
 after(async () => env?.cleanup())
 beforeEach(seed)
 
-const ITEM = { catalogId: 'p1', name: 'Widget', qty: 2, cost: 15, sell: 25 } // cost 30, sell 50, profit 20
+const ITEM = { catalogId: 'p1', name: 'Widget', qty: 2, cost: 15, sell: 25 } // cost 30, sell 50
+// With no seller profitRatio set, profit falls back to a random 18%-20% of the sale total.
+const inFallbackRange = (total, profit) => profit >= total * 0.18 - 0.01 && profit <= total * 0.2 + 0.01
 
 // A verified, funded seller shop for s1 under a1, built through the same calls the apps make.
 async function verifiedShop({ balance = 100 } = {}) {
@@ -199,6 +203,14 @@ describe('balances', () => {
     const data = await read(db('s1'), 'shops/s1')
     assert.deepEqual([data.guarantee, data.rating, data.productLimit], [40, 4.26, 12])
   })
+
+  it('sets a seller profit ratio and refuses one outside 0-100%', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    assert.equal((await shop.setProfitRatio(db('a1'), target, 0.25, 'a1')).newRatio, 0.25)
+    assert.equal((await read(db('s1'), 'shops/s1')).profitRatio, 0.25)
+    assert.equal((await shop.setProfitRatio(db('a1'), target, 1.5, 'a1')).success, false)
+    assert.equal((await shop.setProfitRatio(db('a1'), target, -0.1, 'a1')).success, false)
+  })
 })
 
 describe('orders', () => {
@@ -206,7 +218,10 @@ describe('orders', () => {
     const target = await verifiedShop({ balance: 100 })
     const given = await shop.createOrder(db('a1'), target, { items: [ITEM], customer: { fullName: 'Buyer' } }, 'a1')
     assert.equal(given.success, true)
-    assert.deepEqual([given.order.total, given.order.cost, given.order.profit], [50, 30, 20])
+    assert.equal(given.order.total, 50)
+    assert.equal(given.order.cost, 30)
+    assert.ok(inFallbackRange(50, given.order.profit), 'profit falls in the 18%-20% fallback range')
+    const profit = given.order.profit
 
     // the seller sees it and pays
     const id = await orderId()
@@ -218,13 +233,47 @@ describe('orders', () => {
     // the admin moves it along and delivers
     assert.equal((await shop.setOrderStatus(db('a1'), target, id, 'Pickup', 'a1')).success, true)
     assert.equal((await shop.setOrderStatus(db('a1'), target, id, 'Delivered', 'a1')).success, true)
-    assert.equal((await read(db('s1'), 'shops/s1')).balance, 90)
+    assert.equal((await read(db('s1'), 'shops/s1')).balance, Math.round((70 + profit) * 100) / 100)
     // moving it back and delivering again must not pay the profit a second time
     await shop.setOrderStatus(db('a1'), target, id, 'Out for delivery', 'a1')
     await shop.setOrderStatus(db('a1'), target, id, 'Delivered', 'a1')
     const after = await read(db('s1'), 'shops/s1')
-    assert.equal(after.balance, 90)
+    assert.equal(after.balance, Math.round((70 + profit) * 100) / 100)
     assert.deepEqual(after.orderStats, { total: 1, pending: 0, delivered: 1 })
+  })
+
+  it('uses the seller\'s profit ratio for new orders instead of the random fallback', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    await shop.setProfitRatio(db('a1'), target, 0.4, 'a1')
+    const ratioed = { ...target, profitRatio: 0.4 }
+    const given = await shop.createOrder(db('a1'), ratioed, { items: [ITEM], customer: { fullName: 'Buyer' } }, 'a1')
+    assert.equal(given.success, true)
+    assert.deepEqual([given.order.total, given.order.cost, given.order.profit], [50, 30, 20])
+  })
+
+  it('sums a multi-item order\'s profit product by product, not off the order total', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    await shop.setProfitRatio(db('a1'), target, 0.5, 'a1')
+    const ratioed = { ...target, profitRatio: 0.5 }
+    const items = [
+      { catalogId: 'p1', name: 'Widget', qty: 2, cost: 15, sell: 25 }, // 50 sale, profit 25
+      { catalogId: 'p2', name: 'Gadget', qty: 1, cost: 40, sell: 60 }, // 60 sale, profit 30
+    ]
+    const given = await shop.createOrder(db('a1'), ratioed, { items, customer: { fullName: 'Buyer' } }, 'a1')
+    assert.equal(given.success, true)
+    assert.deepEqual([given.order.total, given.order.cost, given.order.profit], [110, 70, 55])
+  })
+
+  it('rolls the fallback ratio per product for a multi-item order with no seller ratio set', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    const items = [
+      { catalogId: 'p1', name: 'Widget', qty: 2, cost: 15, sell: 25 }, // 50 sale
+      { catalogId: 'p2', name: 'Gadget', qty: 1, cost: 40, sell: 60 }, // 60 sale
+    ]
+    const given = await shop.createOrder(db('a1'), target, { items, customer: { fullName: 'Buyer' } }, 'a1')
+    assert.equal(given.success, true)
+    assert.deepEqual([given.order.total, given.order.cost], [110, 70])
+    assert.ok(inFallbackRange(110, given.order.profit), 'profit falls in the 18%-20% fallback range')
   })
 
   it('refuses payment when the balance is too low', async () => {
@@ -302,7 +351,8 @@ describe('scheduled orders', () => {
     const id = await give(target)
     const [stored] = await schedulesOf()
     assert.equal(stored.status, 'Scheduled')
-    assert.deepEqual([stored.total, stored.cost, stored.profit, stored.qty], [50, 30, 20, 2])
+    assert.deepEqual([stored.total, stored.cost, stored.qty], [50, 30, 2])
+    assert.ok(inFallbackRange(50, stored.profit), 'profit falls in the 18%-20% fallback range')
     assert.equal((await ordersOf()).length, 0)
     assert.equal((await read(db('a1'), 'shops/s1')).orderStats.total, 0)
     await assertFails(getDoc(doc(db('s1'), `scheduledOrders/${id}`)))
@@ -338,7 +388,8 @@ describe('scheduled orders', () => {
     assert.equal(order.id, forced.orderId)
     assert.equal(order.status, 'Unpaid')
     assert.equal(order.customer.fullName, 'Buyer')
-    assert.deepEqual([order.total, order.cost, order.profit], [50, 30, 20])
+    assert.deepEqual([order.total, order.cost], [50, 30])
+    assert.ok(inFallbackRange(50, order.profit), 'profit falls in the 18%-20% fallback range')
     assert.ok(order.scheduledFor)
     const [stored] = await schedulesOf()
     assert.deepEqual([stored.status, stored.orderId], ['Created', order.id])
@@ -684,6 +735,48 @@ describe('support chat', () => {
     await assertFails(setDoc(doc(db('s1'), 'notifications/chat-wrong-admin'), { ...note, adminId: 'a2' }))
     await assertFails(setDoc(doc(db('s1'), 'notifications/not-chat'), { ...note, type: 'kyc' }))
     await assertFails(setDoc(doc(db('s1'), 'notifications/bad-recipient'), { ...note, recipient: 'everyone' }))
+  })
+
+  it('sends an attachment-only message', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const id = shop.conversationId('s1')
+    const attachment = { type: 'image', url: 'https://example.com/x.jpg', name: 'photo.jpg', contentType: 'image/jpeg', size: 1024 }
+    assert.equal((await shop.sendSupportMessage(db('s1'), target, 'seller', '', attachment)).success, true)
+    assert.equal((await shop.sendSupportMessage(db('s1'), target, 'seller', '')).success, false)
+    const conversation = await read(db('a1'), `supportConversations/${id}`)
+    assert.deepEqual(conversation.messages[0].attachment, attachment)
+    assert.equal(conversation.messages[0].text, '')
+  })
+
+  it("lets the admin edit or unsend their own message without ever rewriting the original (stays append-only)", async () => {
+    const target = await verifiedShop({ balance: 0 })
+    const id = shop.conversationId('s1')
+    await shop.sendSupportMessage(db('s1'), target, 'seller', 'Help me')
+    await shop.sendSupportMessage(db('a1'), target, 'admin', 'On it')
+    const before = await read(db('a1'), `supportConversations/${id}`)
+    const adminMessageId = before.messages.find((m) => m.sender === 'admin').id
+
+    assert.equal((await shop.editSupportMessage(db('a1'), target, adminMessageId, 'On it right away')).success, true)
+    const afterEdit = await read(db('a1'), `supportConversations/${id}`)
+    // the original two entries are untouched — editing only appended a third, "supersede" entry
+    assert.equal(afterEdit.messages.length, 3)
+    assert.deepEqual(afterEdit.messages.slice(0, 2), before.messages)
+    assert.equal(afterEdit.messages[2].supersedes, adminMessageId)
+    assert.equal(afterEdit.messages[2].sender, 'admin')
+    const foldedAfterEdit = shop.foldSupportMessages(afterEdit.messages)
+    assert.deepEqual(foldedAfterEdit.map((m) => m.text), ['Help me', 'On it right away'])
+    assert.equal(foldedAfterEdit[1].editedAt, afterEdit.messages[2].at)
+
+    assert.equal((await shop.deleteSupportMessage(db('a1'), target, adminMessageId)).success, true)
+    const afterDelete = await read(db('a1'), `supportConversations/${id}`)
+    assert.equal(afterDelete.messages.length, 4)
+    assert.deepEqual(afterDelete.messages.slice(0, 2), before.messages) // still never rewritten
+    const foldedAfterDelete = shop.foldSupportMessages(afterDelete.messages)
+    assert.equal(foldedAfterDelete[1].deleted, true)
+    assert.equal(foldedAfterDelete[1].text, undefined)
+
+    // a seller cannot touch a conversation that isn't theirs, edit or not
+    assert.equal((await shop.editSupportMessage(db('s2'), target, adminMessageId, 'nope')).success, false)
   })
 })
 

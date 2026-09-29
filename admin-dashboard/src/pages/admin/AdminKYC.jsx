@@ -96,117 +96,117 @@ const KYCDetailModal = ({ seller, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
       <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in max-h-[95vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="p-5 border-b border-gray-100">
+        <div className="p-3.5 sm:p-5 border-b border-gray-100">
           <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3">
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl font-black shrink-0">
+            <div className="flex items-start gap-2.5 sm:gap-3">
+              <div className="w-11 h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-base sm:text-2xl font-black shrink-0">
                 {(seller.shopName || 'S').split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2)}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-2xl font-black text-gray-900">{seller.shopName}</h3>
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-black border ${approved ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : rejected ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                    <Icon name="check" className="w-4 h-4" /> {kycStatus}
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-2xl font-black text-gray-900">{seller.shopName}</h3>
+                  <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10.5px] sm:text-sm font-black border ${approved ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : rejected ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                    <Icon name="check" className="w-3 h-3 sm:w-4 sm:h-4" /> {kycStatus}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 text-gray-600 font-semibold">
-                  <Icon name="user" className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-1.5 mt-1 text-[12.5px] sm:text-base text-gray-600 font-semibold">
+                  <Icon name="user" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
                   <span>{seller.ownerName || seller.fullName}</span>
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 text-gray-500 font-medium text-sm">
-                  <Icon name="calendar" className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-1.5 mt-1 text-gray-500 font-medium text-[11.5px] sm:text-sm">
+                  <Icon name="calendar" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
                   <span>Submitted {seller.kyc?.submittedAt || seller.memberSince}</span>
                 </div>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
-              <Icon name="close" className="w-6 h-6" />
+            <button onClick={onClose} className="p-1.5 sm:p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+              <Icon name="close" className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-5 space-y-6">
+        <div className="overflow-y-auto flex-1 p-3.5 sm:p-5 space-y-4 sm:space-y-6">
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Icon name="shield" className="w-5 h-5 text-gray-800" />
-              <h4 className="text-lg font-black text-gray-900 uppercase tracking-wide">Identity</h4>
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Icon name="shield" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />
+              <h4 className="text-sm sm:text-lg font-black text-gray-900 uppercase tracking-wide">Identity</h4>
             </div>
-            <div className="space-y-3.5">
+            <div className="space-y-2.5 sm:space-y-3.5">
               <div>
-                <p className="text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Shop name</p>
-                <p className="text-xl font-bold text-gray-900">{seller.shopName}</p>
+                <p className="text-[11px] sm:text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Shop name</p>
+                <p className="text-base sm:text-xl font-bold text-gray-900">{seller.shopName}</p>
               </div>
               <div>
-                <p className="text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Owner</p>
-                <p className="text-xl font-bold text-gray-900">{seller.ownerName || seller.fullName}</p>
+                <p className="text-[11px] sm:text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Owner</p>
+                <p className="text-base sm:text-xl font-bold text-gray-900">{seller.ownerName || seller.fullName}</p>
               </div>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Email</p>
+                  <p className="text-[11px] sm:text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Email</p>
                   <div className="flex items-center gap-1 text-gray-900">
-                    <Icon name="mail" className="w-5 h-5 text-gray-500 shrink-0" />
-                    <p className="text-lg font-bold truncate">{seller.email}</p>
+                    <Icon name="mail" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
+                    <p className="text-[13px] sm:text-lg font-bold truncate">{seller.email}</p>
                   </div>
                 </div>
-                <button onClick={copyEmail} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-indigo-600 transition-colors shrink-0">
-                  <Icon name="copy" className="w-5 h-5" />
+                <button onClick={copyEmail} className="p-1.5 sm:p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-indigo-600 transition-colors shrink-0">
+                  <Icon name="copy" className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
               <div>
-                <p className="text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Phone</p>
+                <p className="text-[11px] sm:text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Phone</p>
                 <div className="flex items-center gap-1 text-gray-900">
-                  <Icon name="phone" className="w-5 h-5 text-gray-500 shrink-0" />
-                  <p className="text-lg font-bold">{seller.kyc?.phone || '—'}</p>
+                  <Icon name="phone" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
+                  <p className="text-[13px] sm:text-lg font-bold">{seller.kyc?.phone || '—'}</p>
                 </div>
               </div>
               <div>
-                <p className="text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Joined</p>
+                <p className="text-[11px] sm:text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Joined</p>
                 <div className="flex items-center gap-1 text-gray-900">
-                  <Icon name="calendar" className="w-5 h-5 text-gray-500 shrink-0" />
-                  <p className="text-lg font-bold">{seller.kyc?.joined || seller.memberSince}</p>
+                  <Icon name="calendar" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
+                  <p className="text-[13px] sm:text-lg font-bold">{seller.kyc?.joined || seller.memberSince}</p>
                 </div>
               </div>
               <div>
-                <p className="text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Document type</p>
-                <p className="text-xl font-bold text-gray-900">{seller.kyc?.docType || 'national_id'}</p>
+                <p className="text-[11px] sm:text-sm font-black uppercase tracking-wider text-gray-500 mb-1">Document type</p>
+                <p className="text-base sm:text-xl font-bold text-gray-900">{seller.kyc?.docType || 'national_id'}</p>
               </div>
             </div>
           </div>
 
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Icon name="file" className="w-5 h-5 text-gray-800" />
-              <h4 className="text-lg font-black text-gray-900 uppercase tracking-wide">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Icon name="file" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />
+              <h4 className="text-[13px] sm:text-lg font-black text-gray-900 uppercase tracking-wide">
                 Submitted Documents — Type: {seller.kyc?.docType || 'national_id'}
               </h4>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {[
                 ['front', 'Identity Document — Front'],
                 ['back', 'Identity Document — Back'],
               ].map(([side, label]) => {
                 const src = docs[side]
                 return (
-                  <div key={side} className="rounded-3xl border-2 border-gray-100 overflow-hidden bg-gray-50">
+                  <div key={side} className="rounded-2xl sm:rounded-3xl border-2 border-gray-100 overflow-hidden bg-gray-50">
                     <div className="aspect-[4/3] flex items-center justify-center bg-gray-100">
                       {src ? (
                         src.startsWith('data:application/pdf') ? (
                           <button type="button" onClick={() => openPdf(src)} className="flex flex-col items-center gap-2 text-gray-500 hover:text-indigo-600">
-                            <Icon name="file" className="w-10 h-10" />
-                            <span className="text-sm font-bold">Open PDF</span>
+                            <Icon name="file" className="w-8 h-8 sm:w-10 sm:h-10" />
+                            <span className="text-xs sm:text-sm font-bold">Open PDF</span>
                           </button>
                         ) : (
                           <img src={src} alt={label} className="h-full w-full object-contain" />
                         )
                       ) : (
                         <div className="flex flex-col items-center gap-2 text-gray-400">
-                          <Icon name="idcard" className="w-10 h-10" />
-                          <span className="text-sm font-bold">{docs.loading ? 'Loading…' : 'Not uploaded'}</span>
+                          <Icon name="idcard" className="w-8 h-8 sm:w-10 sm:h-10" />
+                          <span className="text-xs sm:text-sm font-bold">{docs.loading ? 'Loading…' : 'Not uploaded'}</span>
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 p-3 bg-white border-t border-gray-100 text-gray-600 font-semibold">
-                      <Icon name="idcard" className="w-5 h-5 text-gray-500" />
+                    <div className="flex items-center gap-2 p-2.5 sm:p-3 bg-white border-t border-gray-100 text-[12.5px] sm:text-base text-gray-600 font-semibold">
+                      <Icon name="idcard" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
                       {label}
                     </div>
                   </div>
@@ -214,35 +214,35 @@ const KYCDetailModal = ({ seller, onClose }) => {
               })}
             </div>
             {(seller.kyc?.country || seller.kyc?.address) && (
-              <div className="mt-4 rounded-2xl bg-gray-50 p-4">
-                <p className="text-xs font-black uppercase tracking-wider text-gray-500 mb-1">Registered address</p>
-                <p className="font-bold text-gray-800">{[seller.kyc?.address, seller.kyc?.country].filter(Boolean).join(' · ')}</p>
+              <div className="mt-3 sm:mt-4 rounded-xl sm:rounded-2xl bg-gray-50 p-3 sm:p-4">
+                <p className="text-[10.5px] sm:text-xs font-black uppercase tracking-wider text-gray-500 mb-1">Registered address</p>
+                <p className="text-[13px] sm:text-base font-bold text-gray-800">{[seller.kyc?.address, seller.kyc?.country].filter(Boolean).join(' · ')}</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="p-5 border-t border-gray-100 space-y-3">
-          {msg && <p className={`text-center font-black ${msgT === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>{msg}</p>}
-          <div className="grid grid-cols-2 gap-3">
+        <div className="p-3.5 sm:p-5 border-t border-gray-100 space-y-2.5 sm:space-y-3">
+          {msg && <p className={`text-center font-black text-sm sm:text-base ${msgT === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>{msg}</p>}
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             <button
               onClick={doApprove}
               disabled={approved || busy}
-              className="inline-flex items-center justify-center gap-2 px-5 py-4 rounded-3xl font-black text-lg text-white bg-gradient-to-br from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-3 sm:py-4 rounded-2xl sm:rounded-3xl font-black text-sm sm:text-lg text-white bg-gradient-to-br from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Icon name="check" className="w-6 h-6" />
+              <Icon name="check" className="w-4 h-4 sm:w-6 sm:h-6" />
               Approve
             </button>
             <button
               onClick={doReject}
               disabled={rejected || busy}
-              className="inline-flex items-center justify-center gap-2 px-5 py-4 rounded-3xl font-black text-lg text-rose-700 bg-rose-50 border-2 border-rose-200 hover:bg-rose-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-3 sm:py-4 rounded-2xl sm:rounded-3xl font-black text-sm sm:text-lg text-rose-700 bg-rose-50 border-2 border-rose-200 hover:bg-rose-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Icon name="x" className="w-6 h-6" />
+              <Icon name="x" className="w-4 h-4 sm:w-6 sm:h-6" />
               Reject
             </button>
           </div>
-          <p className="text-center text-sm text-gray-500 font-semibold">
+          <p className="text-center text-xs sm:text-sm text-gray-500 font-semibold">
             Status: {kycStatus} · use the seller's profile to reset.
           </p>
         </div>
@@ -288,20 +288,20 @@ const AdminKYC = () => {
     <div className="max-w-3xl mx-auto space-y-5 py-2">
       <div className="sticky top-0 z-10 -mx-2 px-2 pt-2 pb-3 bg-gray-50/95 backdrop-blur-md">
         <div className="relative">
-          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
-            <Icon name="search" className="w-7 h-7" />
+          <span className="absolute left-3.5 sm:left-5 top-1/2 -translate-y-1/2 text-gray-400">
+            <Icon name="search" className="w-5 h-5 sm:w-7 sm:h-7" />
           </span>
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search shop, owner, email..."
-            className="w-full pl-16 pr-5 py-4 bg-white border-2 border-gray-100 rounded-3xl text-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-sm"
+            className="w-full pl-11 sm:pl-16 pr-4 sm:pr-5 py-2.5 sm:py-4 bg-white border-2 border-gray-100 rounded-2xl sm:rounded-3xl text-sm sm:text-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-sm"
           />
         </div>
       </div>
 
-      <div className="space-y-3.5">
+      <div className="space-y-2.5 sm:space-y-3.5">
         {records.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border-2 border-dashed border-gray-200">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
@@ -320,45 +320,45 @@ const AdminKYC = () => {
               <button
                 key={s.id}
                 onClick={() => setSelected(s)}
-                className={`w-full text-left relative overflow-hidden rounded-3xl bg-white border-2 ${pending ? 'border-amber-100' : approved ? 'border-emerald-50' : 'border-rose-50'} shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all pr-4 pl-5 py-5`}
+                className={`w-full text-left relative overflow-hidden rounded-2xl sm:rounded-3xl bg-white border-2 ${pending ? 'border-amber-100' : approved ? 'border-emerald-50' : 'border-rose-50'} shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all pr-3 pl-4 py-3.5 sm:pr-4 sm:pl-5 sm:py-5`}
               >
-                <span className={`absolute left-0 top-0 bottom-0 w-[5px] ${pending ? 'bg-amber-400' : approved ? 'bg-teal-400' : 'bg-rose-400'}`} />
-                <div className="flex items-start gap-4">
-                  <div className={`w-16 h-16 rounded-2xl ${color} flex items-center justify-center shrink-0 font-black text-2xl`}>
+                <span className={`absolute left-0 top-0 bottom-0 w-[4px] sm:w-[5px] ${pending ? 'bg-amber-400' : approved ? 'bg-teal-400' : 'bg-rose-400'}`} />
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className={`w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl ${color} flex items-center justify-center shrink-0 font-black text-sm sm:text-2xl`}>
                     {initials(s.shopName || s.ownerName || s.fullName)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start justify-between gap-2 sm:gap-3">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-2xl font-black text-gray-900 truncate">{s.shopName}</h3>
-                          <div className="flex items-center gap-1.5 text-gray-500 font-semibold whitespace-nowrap">
-                            <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                          <h3 className="text-[15px] sm:text-2xl font-black text-gray-900 truncate">{s.shopName}</h3>
+                          <div className="flex items-center gap-1.5 text-[11px] sm:text-base text-gray-500 font-semibold whitespace-nowrap">
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-300 inline-block" />
                             {s.lastActive}
                           </div>
                         </div>
-                        <p className="mt-0.5 text-lg font-bold text-gray-700">{s.ownerName || s.fullName}</p>
+                        <p className="mt-0.5 text-[13px] sm:text-lg font-bold text-gray-700">{s.ownerName || s.fullName}</p>
                       </div>
-                      <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-black border shrink-0 ${approved ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : rejected ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                        <Icon name={pending ? 'clock' : 'check'} className="w-4 h-4" />
+                      <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[10.5px] sm:text-sm font-black border shrink-0 ${approved ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : rejected ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                        <Icon name={pending ? 'clock' : 'check'} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         {status}
                       </span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0 text-gray-700">
-                        <Icon name="mail" className="w-5 h-5 text-gray-400 shrink-0" />
-                        <span className="truncate font-semibold">{s.email}</span>
+                    <div className="mt-1.5 sm:mt-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 text-gray-700">
+                        <Icon name="mail" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+                        <span className="truncate text-[13px] sm:text-base font-semibold">{s.email}</span>
                       </div>
                       <button
                         data-email={s.email}
                         onClick={copyEmail}
                         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-colors shrink-0"
                       >
-                        <Icon name="copy" className="w-5 h-5" />
+                        <Icon name="copy" className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
-                    <div className="mt-1.5 flex items-center gap-1 text-gray-500 font-medium">
-                      <Icon name="calendar" className="w-4 h-4 text-gray-400" />
+                    <div className="mt-1 sm:mt-1.5 flex items-center gap-1 text-[11.5px] sm:text-base text-gray-500 font-medium">
+                      <Icon name="calendar" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
                       <span>Joined {s.kyc?.joined || s.memberSince}</span>
                     </div>
                   </div>

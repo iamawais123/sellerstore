@@ -1,4 +1,4 @@
-// Products imported from the live U Seller Store catalogue (4884 products across 20 categories).
+// Products imported from the live Verified Seller Store catalogue (4884 products across 20 categories).
 // Generated file — prices, ratings, review counts, images and descriptions are copied as-is.
 // Gallery, description sections and reviews live in public/imported-data/<id>.json and are fetched on demand by the product page.
 export const importedProducts = [

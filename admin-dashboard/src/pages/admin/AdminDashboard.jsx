@@ -142,232 +142,232 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-[#0b2545] to-[#13315c] p-7 lg:p-8 shadow-2xl shadow-slate-900/30">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-slate-900 via-[#0b2545] to-[#13315c] p-4 sm:p-7 lg:p-8 shadow-2xl shadow-slate-900/30">
         <div className="absolute top-0 right-0 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-10 w-72 h-72 rounded-full bg-teal-400/10 blur-3xl pointer-events-none" />
 
-        <div className="relative flex items-start justify-between mb-5">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-2xl shadow-green-500/40">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="relative flex items-start justify-between mb-3 sm:mb-5">
+          <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-3xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-2xl shadow-green-500/40">
+            <svg className="w-5 h-5 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
           </div>
-          <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 backdrop-blur-sm">
+          <div className="inline-flex items-center space-x-1.5 sm:space-x-2 px-2.5 py-1 sm:px-4 sm:py-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 backdrop-blur-sm">
             <span className="relative flex w-2 h-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full w-2 h-2 bg-emerald-400" />
             </span>
-            <span className="text-emerald-300 text-sm font-bold tracking-wide">LIVE</span>
+            <span className="text-emerald-300 text-[11px] sm:text-sm font-bold tracking-wide">LIVE</span>
           </div>
         </div>
 
-        <p className="relative text-slate-300 font-bold uppercase tracking-[0.18em] text-[13px] mb-3">
+        <p className="relative text-slate-300 font-bold uppercase tracking-[0.14em] sm:tracking-[0.18em] text-[10.5px] sm:text-[13px] mb-1.5 sm:mb-3">
           Sellers' Total Balance
         </p>
-        <p className="relative text-white font-black text-5xl lg:text-6xl tracking-tight mb-3">
+        <p className="relative text-white font-black text-[28px] sm:text-5xl lg:text-6xl tracking-tight mb-1.5 sm:mb-3">
           {money(totalSellerBalance)}
         </p>
-        <p className="relative text-slate-400 text-[15px] font-medium">
+        <p className="relative text-slate-400 text-[12px] sm:text-[15px] font-medium">
           Combined shop balance across your {totalSellersCount} store{totalSellersCount === 1 ? '' : 's'}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-sky-50 flex items-center justify-center border border-sky-100">
-              <svg className="w-6 h-6 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between mb-2.5 sm:mb-4">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-sky-50 flex items-center justify-center border border-sky-100">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
-            <button onClick={() => navigate('/sellers')} className="p-2 rounded-xl hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button onClick={() => navigate('/sellers')} className="p-1.5 sm:p-2 rounded-xl hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </button>
           </div>
-          <p className="text-gray-500 font-bold uppercase tracking-[0.15em] text-[12.5px] mb-1.5">
+          <p className="text-gray-500 font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] text-[10.5px] sm:text-[12.5px] mb-1 sm:mb-1.5">
             Total Sellers
           </p>
-          <p className="text-5xl font-black text-gray-900 tracking-tight mb-4">{totalSellersCount}</p>
-          <button onClick={() => navigate('/kyc')} className="w-full inline-flex items-center justify-between px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border border-amber-100 transition-all group">
-            <span className="text-amber-900 font-bold text-[14.5px]">
+          <p className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tight mb-2.5 sm:mb-4">{totalSellersCount}</p>
+          <button onClick={() => navigate('/kyc')} className="w-full inline-flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border border-amber-100 transition-all group">
+            <span className="text-amber-900 font-bold text-[12px] sm:text-[14.5px]">
               {pendingKYC} pending KYC
             </span>
-            <svg className="w-5 h-5 text-amber-700 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
           </button>
         </div>
 
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center border border-orange-100">
-              <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between mb-2.5 sm:mb-4">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-orange-50 flex items-center justify-center border border-orange-100">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
             </div>
-            <button onClick={() => navigate('/orders')} className="p-2 rounded-xl hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button onClick={() => navigate('/orders')} className="p-1.5 sm:p-2 rounded-xl hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </button>
           </div>
-          <p className="text-gray-500 font-bold uppercase tracking-[0.15em] text-[12.5px] mb-1.5">
+          <p className="text-gray-500 font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] text-[10.5px] sm:text-[12.5px] mb-1 sm:mb-1.5">
             Active Deliveries
           </p>
-          <p className="text-5xl font-black text-gray-900 tracking-tight mb-4">{pendingOrders + inDeliveryOrders}</p>
-          <button onClick={() => navigate('/orders')} className="w-full inline-flex items-center justify-between px-4 py-3 rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 border border-orange-100 transition-all group">
-            <span className="text-orange-900 font-bold text-[14.5px]">
+          <p className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tight mb-2.5 sm:mb-4">{pendingOrders + inDeliveryOrders}</p>
+          <button onClick={() => navigate('/orders')} className="w-full inline-flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 border border-orange-100 transition-all group">
+            <span className="text-orange-900 font-bold text-[12px] sm:text-[14.5px]">
               {pendingOrders} pending · {inDeliveryOrders} in transit
             </span>
-            <svg className="w-5 h-5 text-orange-700 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-700 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
           </button>
         </div>
 
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow md:col-span-2 lg:col-span-1">
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center border border-violet-100">
-              <svg className="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow md:col-span-2 lg:col-span-1">
+          <div className="flex items-start justify-between mb-2.5 sm:mb-4">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-violet-50 flex items-center justify-center border border-violet-100">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <button onClick={() => navigate('/support')} className="p-2 rounded-xl hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button onClick={() => navigate('/support')} className="p-1.5 sm:p-2 rounded-xl hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </button>
           </div>
-          <p className="text-gray-500 font-bold uppercase tracking-[0.15em] text-[12.5px] mb-1.5">
+          <p className="text-gray-500 font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] text-[10.5px] sm:text-[12.5px] mb-1 sm:mb-1.5">
             Active Tickets
           </p>
-          <p className="text-5xl font-black text-gray-900 tracking-tight mb-4">{activeTickets.length}</p>
-          <button onClick={() => navigate('/support')} className="w-full inline-flex items-center justify-between px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border border-amber-100 transition-all group">
-            <span className="text-amber-900 font-bold text-[14.5px]">
+          <p className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tight mb-2.5 sm:mb-4">{activeTickets.length}</p>
+          <button onClick={() => navigate('/support')} className="w-full inline-flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border border-amber-100 transition-all group">
+            <span className="text-amber-900 font-bold text-[12px] sm:text-[14.5px]">
               {unreadTickets} unread message{unreadTickets === 1 ? '' : 's'}
             </span>
-            <svg className="w-5 h-5 text-amber-700 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div onClick={() => navigate('/orders')} role="button" tabIndex={0} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-amber-50 flex items-center justify-center border border-amber-100 shrink-0">
-              <svg className="w-5.5 h-5.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+        <div onClick={() => navigate('/orders')} role="button" tabIndex={0} className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5 hover:shadow-md transition-shadow cursor-pointer">
+          <div className="flex items-center space-x-2.5 sm:space-x-3.5">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-2xl bg-amber-50 flex items-center justify-center border border-amber-100 shrink-0">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div>
-              <p className="text-3xl font-black text-gray-900 leading-none">{pendingOrders}</p>
-              <p className="text-[14.5px] text-gray-600 font-semibold mt-1">Pending Orders</p>
+              <p className="text-lg sm:text-3xl font-black text-gray-900 leading-none">{pendingOrders}</p>
+              <p className="text-[11px] sm:text-[14.5px] text-gray-600 font-semibold mt-0.5 sm:mt-1">Pending Orders</p>
             </div>
           </div>
         </div>
 
-        <div onClick={() => navigate('/orders')} role="button" tabIndex={0} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0">
-              <svg className="w-5.5 h-5.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div onClick={() => navigate('/orders')} role="button" tabIndex={0} className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5 hover:shadow-md transition-shadow cursor-pointer">
+          <div className="flex items-center space-x-2.5 sm:space-x-3.5">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
               </svg>
             </div>
             <div>
-              <p className="text-3xl font-black text-gray-900 leading-none">{inDeliveryOrders}</p>
-              <p className="text-[14.5px] text-gray-600 font-semibold mt-1">In Delivery</p>
+              <p className="text-lg sm:text-3xl font-black text-gray-900 leading-none">{inDeliveryOrders}</p>
+              <p className="text-[11px] sm:text-[14.5px] text-gray-600 font-semibold mt-0.5 sm:mt-1">In Delivery</p>
             </div>
           </div>
         </div>
 
-        <div onClick={() => navigate('/orders')} role="button" tabIndex={0} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-sky-50 flex items-center justify-center border border-sky-100 shrink-0">
-              <svg className="w-5.5 h-5.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div onClick={() => navigate('/orders')} role="button" tabIndex={0} className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5 hover:shadow-md transition-shadow cursor-pointer">
+          <div className="flex items-center space-x-2.5 sm:space-x-3.5">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-2xl bg-sky-50 flex items-center justify-center border border-sky-100 shrink-0">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div>
-              <p className="text-3xl font-black text-gray-900 leading-none">{completedOrders}</p>
-              <p className="text-[14.5px] text-gray-600 font-semibold mt-1">Completed Orders</p>
+              <p className="text-lg sm:text-3xl font-black text-gray-900 leading-none">{completedOrders}</p>
+              <p className="text-[11px] sm:text-[14.5px] text-gray-600 font-semibold mt-0.5 sm:mt-1">Completed Orders</p>
             </div>
           </div>
         </div>
 
-        <div onClick={() => navigate('/withdrawals')} role="button" tabIndex={0} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-rose-50 flex items-center justify-center border border-rose-100 shrink-0">
-              <svg className="w-5.5 h-5.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div onClick={() => navigate('/withdrawals')} role="button" tabIndex={0} className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5 hover:shadow-md transition-shadow cursor-pointer">
+          <div className="flex items-center space-x-2.5 sm:space-x-3.5">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-2xl bg-rose-50 flex items-center justify-center border border-rose-100 shrink-0">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
               </svg>
             </div>
             <div>
-              <p className="text-3xl font-black text-gray-900 leading-none">{pendingWithdrawals}</p>
-              <p className="text-[14.5px] text-gray-600 font-semibold mt-1">Pending Withdrawals</p>
+              <p className="text-lg sm:text-3xl font-black text-gray-900 leading-none">{pendingWithdrawals}</p>
+              <p className="text-[11px] sm:text-[14.5px] text-gray-600 font-semibold mt-0.5 sm:mt-1">Pending Withdrawals</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 lg:p-8">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100">
-              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm p-4 sm:p-6 lg:p-8">
+        <div className="flex items-start justify-between mb-3 sm:mb-6">
+          <div className="flex items-center space-x-2.5 sm:space-x-3.5">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
             <div>
-              <h2 className="text-[22px] font-black text-gray-900 leading-tight">
+              <h2 className="text-base sm:text-[22px] font-black text-gray-900 leading-tight">
                 Daily Revenue & Order Volume
               </h2>
-              <p className="text-gray-500 font-medium text-[14.5px] mt-0.5">
+              <p className="text-gray-500 font-medium text-[11.5px] sm:text-[14.5px] mt-0.5">
                 Past 7 days · revenue from delivered orders
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-6 lg:gap-10 mb-6">
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6 lg:gap-10 mb-3 sm:mb-6">
           <div>
-            <p className="text-gray-500 font-bold uppercase tracking-[0.18em] text-[12.5px] mb-1.5">
+            <p className="text-gray-500 font-bold uppercase tracking-[0.14em] sm:tracking-[0.18em] text-[10.5px] sm:text-[12.5px] mb-1 sm:mb-1.5">
               Revenue
             </p>
-            <p className="text-4xl lg:text-5xl font-black text-gray-900 tracking-tight">
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-black text-gray-900 tracking-tight">
               {money(weekRevenue)}
             </p>
           </div>
           <div>
-            <p className="text-gray-500 font-bold uppercase tracking-[0.18em] text-[12.5px] mb-1.5">
+            <p className="text-gray-500 font-bold uppercase tracking-[0.14em] sm:tracking-[0.18em] text-[10.5px] sm:text-[12.5px] mb-1 sm:mb-1.5">
               Orders
             </p>
-            <p className="text-4xl lg:text-5xl font-black text-indigo-600 tracking-tight">
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-black text-indigo-600 tracking-tight">
               {weekOrders}
             </p>
           </div>
         </div>
 
         {/* HTML legend */}
-        <div className="flex items-center gap-5 mb-5">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-indigo-600" />
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Revenue</span>
+        <div className="flex items-center gap-4 sm:gap-5 mb-3 sm:mb-5">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-indigo-600" />
+            <span className="text-[10.5px] sm:text-xs font-bold text-gray-500 uppercase tracking-wide">Revenue</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <svg width="20" height="12" className="shrink-0">
               <line x1="0" y1="6" x2="20" y2="6" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" />
               <circle cx="10" cy="6" r="3" fill="white" stroke="#f97316" strokeWidth="1.5" />
             </svg>
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Orders</span>
+            <span className="text-[10.5px] sm:text-xs font-bold text-gray-500 uppercase tracking-wide">Orders</span>
           </div>
         </div>
 
         {weekOrders === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-gray-200 py-14 text-center font-bold text-gray-400">
+          <div className="rounded-2xl border-2 border-dashed border-gray-200 py-10 sm:py-14 text-center font-bold text-sm sm:text-base text-gray-400">
             No orders in the past 7 days yet.
           </div>
         ) : (
@@ -464,110 +464,110 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 lg:p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <span className="relative flex w-3.5 h-3.5">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm p-4 sm:p-6 lg:p-8">
+        <div className="flex items-center justify-between mb-3 sm:mb-6">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <span className="relative flex w-3 h-3 sm:w-3.5 sm:h-3.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full w-3.5 h-3.5 bg-emerald-500" />
+              <span className="relative inline-flex rounded-full w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-500" />
             </span>
-            <h2 className="text-[22px] font-black text-gray-900 leading-tight">
+            <h2 className="text-base sm:text-[22px] font-black text-gray-900 leading-tight">
               Real-time Logs
             </h2>
           </div>
-          <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full border border-emerald-200 bg-emerald-50">
+          <div className="inline-flex items-center space-x-1.5 sm:space-x-2 px-2.5 py-1 sm:px-4 sm:py-2 rounded-full border border-emerald-200 bg-emerald-50">
             <span className="relative flex w-2 h-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full w-2 h-2 bg-emerald-500" />
             </span>
-            <span className="text-emerald-700 text-sm font-bold tracking-wide">LIVE</span>
+            <span className="text-emerald-700 text-[11px] sm:text-sm font-bold tracking-wide">LIVE</span>
           </div>
         </div>
 
         {adminLogs.length ? (
-          <div className="space-y-1.5">
+          <div className="space-y-1 sm:space-y-1.5">
             {adminLogs.slice(0, 8).map((log) => (
               <div
                 key={log.id}
-                className="flex items-center space-x-4 p-4 rounded-2xl hover:bg-gray-50 transition-colors"
+                className="flex items-center space-x-2.5 sm:space-x-4 p-2.5 sm:p-4 rounded-xl sm:rounded-2xl hover:bg-gray-50 transition-colors"
               >
-                <div className="w-11 h-11 rounded-2xl bg-gray-50 flex items-center justify-center border border-gray-100 shrink-0">
+                <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-2xl bg-gray-50 flex items-center justify-center border border-gray-100 shrink-0 [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-5 sm:[&_svg]:h-5">
                   {getLogIcon(log.icon)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-gray-900 text-[15px] leading-tight truncate">
+                  <p className="font-bold text-gray-900 text-[13px] sm:text-[15px] leading-tight truncate">
                     {log.title}
                   </p>
-                  <p className="text-gray-500 font-medium text-[14px] truncate mt-0.5">
+                  <p className="text-gray-500 font-medium text-[11.5px] sm:text-[14px] truncate mt-0.5">
                     {log.entity}
                   </p>
                 </div>
-                <p className="text-gray-400 font-semibold text-sm shrink-0">{log.time}</p>
+                <p className="text-gray-400 font-semibold text-[11px] sm:text-sm shrink-0">{log.time}</p>
               </div>
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border-2 border-dashed border-gray-200 py-14 text-center font-bold text-gray-400">
+          <div className="rounded-2xl border-2 border-dashed border-gray-200 py-10 sm:py-14 text-center font-bold text-sm sm:text-base text-gray-400">
             No activity yet. Actions you take will show up here in real time.
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 lg:p-8">
-        <h2 className="text-[22px] font-black text-gray-900 mb-2">Quick Action Utilities</h2>
-        <p className="text-gray-500 font-medium text-[14.5px] mb-6">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm p-4 sm:p-6 lg:p-8">
+        <h2 className="text-base sm:text-[22px] font-black text-gray-900 mb-1 sm:mb-2">Quick Action Utilities</h2>
+        <p className="text-gray-500 font-medium text-[11.5px] sm:text-[14.5px] mb-3 sm:mb-6">
           Shortcuts to common admin tasks
         </p>
 
-        <div className="space-y-3.5">
-          <button onClick={() => navigate('/orders')} className="w-full flex items-center space-x-4 p-5 rounded-2xl border-2 border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-all group text-left">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="space-y-2.5 sm:space-y-3.5">
+          <button onClick={() => navigate('/orders')} className="w-full flex items-center space-x-3 sm:space-x-4 p-3 sm:p-5 rounded-xl sm:rounded-2xl border-2 border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-all group text-left">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+              <svg className="w-5 h-5 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v16m8-8H4" />
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-gray-900 text-[17px] leading-tight">Give Order</p>
-              <p className="text-gray-500 font-medium text-[14px] mt-0.5">
+              <p className="font-black text-gray-900 text-[14px] sm:text-[17px] leading-tight">Give Order</p>
+              <p className="text-gray-500 font-medium text-[12px] sm:text-[14px] mt-0.5">
                 Assign a new order to one of your verified sellers
               </p>
             </div>
-            <svg className="w-6 h-6 text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
           </button>
 
-          <button onClick={() => navigate('/support')} className="w-full flex items-center space-x-4 p-5 rounded-2xl border-2 border-gray-100 hover:border-amber-200 hover:bg-amber-50/40 transition-all group text-left">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-300 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={() => navigate('/support')} className="w-full flex items-center space-x-3 sm:space-x-4 p-3 sm:p-5 rounded-xl sm:rounded-2xl border-2 border-gray-100 hover:border-amber-200 hover:bg-amber-50/40 transition-all group text-left">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-300 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
+              <svg className="w-5 h-5 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-gray-900 text-[17px] leading-tight">Support Inbox</p>
-              <p className="text-gray-500 font-medium text-[14px] mt-0.5">
+              <p className="font-black text-gray-900 text-[14px] sm:text-[17px] leading-tight">Support Inbox</p>
+              <p className="text-gray-500 font-medium text-[12px] sm:text-[14px] mt-0.5">
                 Reply to seller conversations
               </p>
             </div>
-            <svg className="w-6 h-6 text-gray-400 group-hover:text-orange-600 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 group-hover:text-orange-600 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
           </button>
 
-          <button onClick={() => navigate('/sellers')} className="w-full flex items-center space-x-4 p-5 rounded-2xl border-2 border-gray-100 hover:border-violet-200 hover:bg-violet-50/40 transition-all group text-left">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={() => navigate('/sellers')} className="w-full flex items-center space-x-3 sm:space-x-4 p-3 sm:p-5 rounded-xl sm:rounded-2xl border-2 border-gray-100 hover:border-violet-200 hover:bg-violet-50/40 transition-all group text-left">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0">
+              <svg className="w-5 h-5 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-gray-900 text-[17px] leading-tight">System Configurations</p>
-              <p className="text-gray-500 font-medium text-[14px] mt-0.5">
+              <p className="font-black text-gray-900 text-[14px] sm:text-[17px] leading-tight">System Configurations</p>
+              <p className="text-gray-500 font-medium text-[12px] sm:text-[14px] mt-0.5">
                 Manage sellers, KYC, balances and access
               </p>
             </div>
-            <svg className="w-6 h-6 text-gray-400 group-hover:text-violet-600 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 group-hover:text-violet-600 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
           </button>

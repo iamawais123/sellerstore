@@ -14,7 +14,7 @@ import {
   updateOwnInviteCode,
   watchAdminProfile,
 } from '../firebase/accounts'
-import { describeError, getServices } from '../firebase/core'
+import { compressImageToDataUrl, describeError, getServices } from '../firebase/core'
 import * as shopData from '../firebase/shopData'
 import { dueSchedules } from '../lib/schedules'
 
@@ -296,6 +296,13 @@ export function AuthProvider({ children }) {
     const { db, auth } = getServices(identityApp)
     return { db, actorId: auth.currentUser?.uid || admin.id }
   }
+
+  // Compresses a chat photo down to a small `data:` URL (no Cloud Storage on the free plan — see
+  // `compressImageToDataUrl`) and returns the metadata `sendSupportMessage` stores on the message.
+  const prepareChatAttachment = async (file) => {
+    const url = await compressImageToDataUrl(file)
+    return { type: 'image', url, name: file.name || 'photo.jpg', contentType: 'image/jpeg', size: url.length }
+  }
   const shopById = (sellerId) => shops.find((item) => item.id === sellerId)
   const withShop = (sellerId, run) => {
     const target = shopById(sellerId)
@@ -455,6 +462,8 @@ export function AuthProvider({ children }) {
 
   const adjustSellerProductLimit = (sellerId, limit) => withShop(sellerId, (db, target, actorId) => shopData.setProductLimit(db, target, limit, actorId))
 
+  const adjustSellerProfitRatio = (sellerId, ratio) => withShop(sellerId, (db, target, actorId) => shopData.setProfitRatio(db, target, ratio, actorId))
+
   const suspendSellerAccount = (sellerId, suspended) => withShop(sellerId, (db, target, actorId) => shopData.setSuspended(db, target, suspended, actorId))
 
   const toggleSellerWithdrawals = (sellerId, blocked) => withShop(sellerId, (db, target, actorId) => shopData.setWithdrawalsBlocked(db, target, blocked, actorId))
@@ -494,10 +503,32 @@ export function AuthProvider({ children }) {
       .filter((conversation) => (role === 'admin' ? conversation.adminId === adminIdFilter : conversation.sellerId === sellerId))
       .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
 
-  const sendSupportMessage = (conversationId, sender, text, sellerId) => {
+  const sendSupportMessage = async (conversationId, sender, text, sellerId, file) => {
     const target = shopById(sellerId || conversations.find((item) => item.id === conversationId)?.sellerId)
+    if (!target) return { success: false, error: 'Seller not found' }
+    let attachment
+    if (file) {
+      try {
+        attachment = await prepareChatAttachment(file)
+      } catch (error) {
+        return { success: false, error: error.message || 'Could not attach that photo. Please try again.' }
+      }
+    }
+    return shopData.sendSupportMessage(acting().db, target, sender, text, attachment)
+  }
+
+  // Admin-only: fix a typo, or unsend, one of the admin's own messages. `mapConversation` runs every
+  // conversation through `foldSupportMessages`, which is what turns these into what the thread shows.
+  const editSupportMessage = (conversationId, messageId, newText) => {
+    const target = shopById(conversations.find((item) => item.id === conversationId)?.sellerId)
     if (!target) return Promise.resolve({ success: false, error: 'Seller not found' })
-    return shopData.sendSupportMessage(acting().db, target, sender, text)
+    return shopData.editSupportMessage(acting().db, target, messageId, newText)
+  }
+
+  const unsendSupportMessage = (conversationId, messageId) => {
+    const target = shopById(conversations.find((item) => item.id === conversationId)?.sellerId)
+    if (!target) return Promise.resolve({ success: false, error: 'Seller not found' })
+    return shopData.deleteSupportMessage(acting().db, target, messageId)
   }
 
   const markSupportRead = async (conversationId, role) => {
@@ -656,6 +687,8 @@ export function AuthProvider({ children }) {
         markAdminNotificationsRead,
         getSupportConversations,
         sendSupportMessage,
+        editSupportMessage,
+        unsendSupportMessage,
         markSupportRead,
         archiveSupportConversation,
         getSellerLoginHistory,
@@ -663,6 +696,7 @@ export function AuthProvider({ children }) {
         adjustSellerGuarantee,
         adjustSellerRating,
         adjustSellerProductLimit,
+        adjustSellerProfitRatio,
         startViewsCampaign,
         pauseViewsCampaign,
         terminateViewsCampaign,

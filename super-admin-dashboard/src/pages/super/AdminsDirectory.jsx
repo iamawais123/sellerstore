@@ -109,11 +109,17 @@ const AdminDetailsModal = ({ admin, ownerName, onClose }) => {
 
 const AdminsDirectory = () => {
   const {
-    superAdmin, admins, getSuperAdminById, getAdminStats, addAdmin, setAdminRemoved,
-    resetAdminPassword, assignAdminToMe, loginAsAdmin,
+    superAdmin, isOwner, admins, superAdmins, removedSuperAdmins, superAdminName, getAdminStats, addAdmin,
+    setAdminRemoved, resetAdminPassword, assignAdminToMe, loginAsAdmin,
   } = useSuperAuth()
   const [searchParams] = useSearchParams()
-  const [scope, setScope] = useState(searchParams.get('scope') === 'all' ? 'all' : 'mine')
+  // Only the owner ever sees admins beyond their own: every other super admin's console holds just
+  // their own branch, so there is no "all admins" view for them. The owner can also narrow "all
+  // admins" down to one super admin's branch (`?by=<super admin id>` opens it that way).
+  const [scopeChoice, setScope] = useState(searchParams.get('scope') === 'all' || searchParams.get('by') ? 'all' : 'mine')
+  const [byChoice, setBy] = useState(searchParams.get('by') || 'all')
+  const scope = isOwner ? scopeChoice : 'mine'
+  const by = isOwner && scope === 'all' ? byChoice : 'all'
   const [search, setSearch] = useState('')
   const [showRemoved, setShowRemoved] = useState(false)
   const [openMenuFor, setOpenMenuFor] = useState(null)
@@ -135,8 +141,7 @@ const AdminsDirectory = () => {
     return () => clearTimeout(timer)
   }, [notice])
 
-  const ownerOf = (admin) => (admin.superAdminId ? getSuperAdminById(admin.superAdminId) : null)
-  const inScope = (admin) => scope === 'all' || admin.superAdminId === superAdmin.id
+  const inScope = (admin) => (scope === 'all' ? by === 'all' || admin.superAdminId === by : admin.superAdminId === superAdmin.id)
   const scoped = admins.filter(inScope)
   const activeCount = scoped.filter((a) => !a.removed).length
   const removedCount = scoped.filter((a) => a.removed).length
@@ -174,7 +179,7 @@ const AdminsDirectory = () => {
     { id: 'details', label: 'Overview & Details', icon: 'activity', run: () => setModal({ type: 'details', admin }) },
     { id: 'password', label: 'Reset Password', icon: 'key', run: () => setModal({ type: 'password', admin }) },
     { id: 'copy', label: 'Copy Invite Code', icon: 'copy', run: () => copyInviteCode(admin) },
-    ...(admin.superAdminId !== superAdmin.id
+    ...(isOwner && admin.superAdminId !== superAdmin.id
       ? [{ id: 'assign', label: 'Assign to Me', icon: 'users', run: () => setModal({ type: 'assign', admin }) }]
       : []),
     { separator: true, label: 'Access' },
@@ -189,53 +194,79 @@ const AdminsDirectory = () => {
     `flex-1 px-4 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${active ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-800'}`
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3 sm:gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Network</p>
-          <h1 className="mt-1 text-3xl font-black text-gray-900">Admins Directory</h1>
-          <p className="mt-1 text-gray-500">Every admin under your invite code — sign in as them, reset access, or remove them.</p>
+          <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Network</p>
+          <h1 className="mt-1 text-xl sm:text-3xl font-black text-gray-900">Admins Directory</h1>
+          <p className="mt-1 text-[13px] sm:text-base text-gray-500">Every admin under your invite code — sign in as them, reset access, or remove them.</p>
         </div>
-        <button onClick={() => setModal({ type: 'add' })} className={primaryButtonClass}>
-          <Icon name="user-plus" className="w-5 h-5" />
+        <button onClick={() => setModal({ type: 'add' })} className={`${primaryButtonClass} !px-4 !py-2.5 !text-sm sm:!px-6 sm:!py-3.5 sm:!text-base`}>
+          <Icon name="user-plus" className="w-4 h-4 sm:w-5 sm:h-5" />
           Add Admin
         </button>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5 sm:space-y-3">
         <div className="relative">
-          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
-            <Icon name="search" className="w-6 h-6" />
+          <span className="absolute left-3.5 sm:left-5 top-1/2 -translate-y-1/2 text-gray-400">
+            <Icon name="search" className="w-4 h-4 sm:w-6 sm:h-6" />
           </span>
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search admin name, email, or invite code..."
-            className="w-full pl-14 pr-5 h-[60px] bg-slate-50 border-2 border-slate-100 rounded-3xl text-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all"
+            className="w-full pl-10 sm:pl-14 pr-4 sm:pr-5 h-11 sm:h-[60px] bg-slate-50 border-2 border-slate-100 rounded-2xl sm:rounded-3xl text-sm sm:text-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all"
           />
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex flex-1 gap-1 p-1 bg-gray-100 rounded-2xl">
-            <button onClick={() => setScope('mine')} className={toolbarButton(scope === 'mine')}>
-              My admins <span className="ml-1 text-xs opacity-70">{myActiveCount}</span>
-            </button>
-            <button onClick={() => setScope('all')} className={toolbarButton(scope === 'all')}>
-              All admins <span className="ml-1 text-xs opacity-70">{allActiveCount}</span>
-            </button>
-          </div>
-          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl">
-            <span className="font-bold text-gray-700">
-              Removed <span className="text-xs opacity-70">{removedCount}</span>
+        <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
+          {isOwner ? (
+            <div className="flex flex-1 gap-1 p-1 bg-gray-100 rounded-xl sm:rounded-2xl">
+              <button onClick={() => setScope('mine')} className={toolbarButton(scope === 'mine')}>
+                My admins <span className="ml-1 text-[11px] sm:text-xs opacity-70">{myActiveCount}</span>
+              </button>
+              <button onClick={() => setScope('all')} className={toolbarButton(scope === 'all')}>
+                All admins <span className="ml-1 text-[11px] sm:text-xs opacity-70">{allActiveCount}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-1 items-center px-3.5 sm:px-5 py-2 sm:py-3 bg-gray-100 rounded-xl sm:rounded-2xl font-bold text-[13px] sm:text-base text-gray-700">
+              Your admins <span className="ml-2 text-[11px] sm:text-xs opacity-70">{myActiveCount}</span>
+            </div>
+          )}
+          {isOwner && scope === 'all' && (
+            <select
+              value={by}
+              onChange={(event) => setBy(event.target.value)}
+              aria-label="Show the admins of"
+              className="px-3.5 sm:px-5 py-2 sm:py-3 bg-slate-50 border-2 border-slate-100 rounded-xl sm:rounded-2xl font-bold text-[13px] sm:text-base text-gray-700 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="all">Every super admin</option>
+              {superAdmins.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.id === superAdmin.id ? `${s.fullName} (you)` : s.fullName}
+                </option>
+              ))}
+              {removedSuperAdmins.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.fullName} (removed)
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="flex items-center justify-between gap-3 sm:gap-4 px-3.5 sm:px-5 py-2 sm:py-3 bg-slate-50 border-2 border-slate-100 rounded-xl sm:rounded-2xl">
+            <span className="font-bold text-[13px] sm:text-base text-gray-700">
+              Removed <span className="text-[11px] sm:text-xs opacity-70">{removedCount}</span>
             </span>
             <button
               onClick={() => setShowRemoved((v) => !v)}
-              className={`relative w-14 h-8 rounded-full transition-all ${showRemoved ? 'bg-indigo-500' : 'bg-gray-300'}`}
+              className={`relative w-10 h-6 sm:w-14 sm:h-8 rounded-full transition-all ${showRemoved ? 'bg-indigo-500' : 'bg-gray-300'}`}
               aria-pressed={showRemoved}
               aria-label="Show removed admins"
             >
-              <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${showRemoved ? 'translate-x-6' : 'translate-x-0'}`} />
+              <span className={`absolute top-1 left-1 w-4 h-4 sm:w-6 sm:h-6 bg-white rounded-full shadow transition-transform ${showRemoved ? 'translate-x-4 sm:translate-x-6' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>
@@ -259,79 +290,79 @@ const AdminsDirectory = () => {
         ) : (
           filtered.map((admin) => {
             const menuOpen = openMenuFor === admin.id
-            const owner = ownerOf(admin)
+            const invitedBy = superAdminName(admin.superAdminId)
             const stats = getAdminStats(admin.id)
             return (
-              <div key={admin.id} className={`relative bg-white rounded-[28px] border shadow-sm overflow-visible ${admin.removed ? 'border-rose-100' : 'border-gray-100'}`}>
-                <div className="p-5">
-                  <div className="flex items-start gap-4">
+              <div key={admin.id} className={`relative bg-white rounded-2xl sm:rounded-[28px] border shadow-sm overflow-visible ${admin.removed ? 'border-rose-100' : 'border-gray-100'}`}>
+                <div className="p-3.5 sm:p-5">
+                  <div className="flex items-start gap-3 sm:gap-4">
                     <div className="relative shrink-0">
-                      <div className={`w-16 h-16 rounded-[22px] bg-gradient-to-br ${avatarColorFor(admin.fullName, admin.email)} flex items-center justify-center text-white text-2xl font-black shadow-lg ${admin.removed ? 'opacity-50' : ''}`}>
+                      <div className={`w-11 h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-[22px] bg-gradient-to-br ${avatarColorFor(admin.fullName, admin.email)} flex items-center justify-center text-white text-sm sm:text-2xl font-black shadow-lg ${admin.removed ? 'opacity-50' : ''}`}>
                         {initialsOf(admin.fullName)}
                       </div>
-                      <span className={`absolute -right-1 -bottom-1 w-5 h-5 rounded-full border-2 border-white ${admin.removed ? 'bg-rose-400' : 'bg-emerald-500'}`} />
+                      <span className={`absolute -right-0.5 -bottom-0.5 sm:-right-1 sm:-bottom-1 w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full border-2 border-white ${admin.removed ? 'bg-rose-400' : 'bg-emerald-500'}`} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-2xl font-black text-gray-900 truncate">{admin.fullName}</h3>
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <h3 className="text-[15px] sm:text-2xl font-black text-gray-900 truncate">{admin.fullName}</h3>
                         {admin.removed && (
-                          <span className="px-2.5 py-1 rounded-full bg-rose-50 border border-rose-100 text-rose-700 text-sm font-bold">Removed</span>
+                          <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-rose-50 border border-rose-100 text-rose-700 text-[10.5px] sm:text-sm font-bold">Removed</span>
                         )}
-                        {!owner && (
-                          <span className="px-2.5 py-1 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-sm font-bold">Unassigned</span>
+                        {!invitedBy && (
+                          <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-[10.5px] sm:text-sm font-bold">Unassigned</span>
                         )}
-                        <span className="text-sm font-semibold text-gray-500">{admin.lastLoginAt ? `Active ${timeAgo(admin.lastLoginAt)}` : 'Never signed in'}</span>
+                        <span className="text-[11px] sm:text-sm font-semibold text-gray-500">{admin.lastLoginAt ? `Active ${timeAgo(admin.lastLoginAt)}` : 'Never signed in'}</span>
                       </div>
-                      <p className="mt-1 text-gray-600 font-medium truncate">{admin.email}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-gray-500 font-semibold">
+                      <p className="mt-0.5 sm:mt-1 text-[12.5px] sm:text-base text-gray-600 font-medium truncate">{admin.email}</p>
+                      <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="text-[11.5px] sm:text-base text-gray-500 font-semibold">
                           Invite code: <span className="text-gray-900 font-mono font-black">{admin.inviteCode}</span>
                         </span>
                         <span className="text-gray-300 hidden sm:inline">|</span>
-                        <span className="text-gray-500 font-semibold">
+                        <span className="text-[11.5px] sm:text-base text-gray-500 font-semibold">
                           Invited by:{' '}
                           <span className="text-gray-900 font-black">
-                            {admin.superAdminId === superAdmin.id ? 'You' : owner ? owner.fullName : 'No super admin'}
+                            {invitedBy || 'No super admin'}
                           </span>
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2 sm:gap-3">
                     <StatTile label="Sellers" value={stats.sellers} />
                     <StatTile label="Pending KYC" value={stats.pendingKYC} tone={stats.pendingKYC ? 'text-amber-600' : 'text-gray-900'} />
                     <StatTile label="Seller balance" value={money(stats.balance)} />
                   </div>
 
-                  <div className="mt-5 flex items-center gap-3">
+                  <div className="mt-3 sm:mt-5 flex items-center gap-2.5 sm:gap-3">
                     <button
                       onClick={() => handleLoginAs(admin)}
                       disabled={admin.removed}
-                      className="flex-1 inline-flex items-center justify-center gap-2.5 h-[56px] px-5 rounded-2xl border-2 border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-900 text-lg font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
+                      className="flex-1 inline-flex items-center justify-center gap-2 sm:gap-2.5 h-10 sm:h-[56px] px-4 sm:px-5 rounded-xl sm:rounded-2xl border-2 border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-900 text-sm sm:text-lg font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
                     >
-                      <Icon name="login" className="w-6 h-6" />
+                      <Icon name="login" className="w-4 h-4 sm:w-6 sm:h-6" />
                       Login
                     </button>
                     <div className="relative" ref={menuOpen ? menuRef : undefined}>
                       <button
                         onClick={() => setOpenMenuFor(menuOpen ? null : admin.id)}
-                        className={`w-14 h-[56px] rounded-2xl border-2 transition-all flex items-center justify-center ${menuOpen ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-600'}`}
+                        className={`w-10 h-10 sm:w-14 sm:h-[56px] rounded-xl sm:rounded-2xl border-2 transition-all flex items-center justify-center ${menuOpen ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-600'}`}
                         aria-expanded={menuOpen}
                         aria-haspopup="menu"
                         aria-label={`Actions for ${admin.fullName}`}
                       >
-                        <Icon name="dots" className="w-6 h-6" />
+                        <Icon name="dots" className="w-4 h-4 sm:w-6 sm:h-6" />
                       </button>
 
                       {menuOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-[300px] bg-white rounded-3xl shadow-2xl border border-gray-100 z-40 overflow-hidden">
+                        <div className="absolute right-0 top-full mt-2 w-[280px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-100 z-40 overflow-hidden">
                           <ul className="max-h-[70vh] overflow-y-auto py-2">
                             {menuFor(admin).map((entry, idx) =>
                               entry.separator ? (
                                 <li key={'sep-' + idx}>
                                   {idx > 0 && <div className="h-px bg-gray-100 my-1.5 mx-3" />}
-                                  <p className="px-5 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">{entry.label}</p>
+                                  <p className="px-4 sm:px-5 py-2 text-[10.5px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">{entry.label}</p>
                                 </li>
                               ) : (
                                 <li key={entry.id}>
@@ -340,12 +371,12 @@ const AdminsDirectory = () => {
                                       setOpenMenuFor(null)
                                       entry.run()
                                     }}
-                                    className={`w-full flex items-center gap-3.5 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors ${entry.color || 'text-gray-700'}`}
+                                    className={`w-full flex items-center gap-3 sm:gap-3.5 px-4 sm:px-5 py-3 sm:py-3.5 text-left hover:bg-gray-50 transition-colors ${entry.color || 'text-gray-700'}`}
                                   >
-                                    <span className="w-9 h-9 rounded-xl bg-gray-100/70 flex items-center justify-center shrink-0">
-                                      <Icon name={entry.icon} className="w-5 h-5" />
+                                    <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gray-100/70 flex items-center justify-center shrink-0">
+                                      <Icon name={entry.icon} className="w-4 h-4 sm:w-5 sm:h-5" />
                                     </span>
-                                    <span className="font-bold text-lg flex-1">{entry.label}</span>
+                                    <span className="font-bold text-[15px] sm:text-lg flex-1">{entry.label}</span>
                                   </button>
                                 </li>
                               )
@@ -377,7 +408,7 @@ const AdminsDirectory = () => {
       {modal?.type === 'details' && (
         <AdminDetailsModal
           admin={admins.find((a) => a.id === modal.admin.id) || modal.admin}
-          ownerName={modal.admin.superAdminId === superAdmin.id ? 'You' : ownerOf(modal.admin)?.fullName || 'No super admin'}
+          ownerName={superAdminName(modal.admin.superAdminId) || 'No super admin'}
           onClose={closeModal}
         />
       )}

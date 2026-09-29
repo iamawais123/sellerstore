@@ -258,7 +258,7 @@ const SellerSignup = () => {
           <div>
             <p className="text-xl font-bold">Seller Portal</p>
             <p className="text-xs uppercase tracking-widest text-blue-200 font-semibold">
-              U Seller Store
+              Verified Seller Store
             </p>
           </div>
         </div>

@@ -117,6 +117,7 @@ const buildMenu = (seller) => [
   groupSeparator('Financials'),
   { id: 'balance', label: 'Adjust Balance', icon: 'wallet', color: 'text-gray-700', seller },
   { id: 'guarantee', label: 'Guarantee Money', icon: 'shield', color: 'text-gray-700', seller },
+  { id: 'profitRatio', label: 'Profit Ratio', icon: 'trending', color: 'text-gray-700', seller },
   groupSeparator('Shop Settings'),
   { id: 'rating', label: 'Shop Rating', icon: 'star', color: 'text-gray-700', seller },
   { id: 'productLimit', label: 'Product Limit', icon: 'package', color: 'text-gray-700', seller },
@@ -1068,6 +1069,107 @@ const ProductLimitModal = ({ seller, onClose }) => {
   )
 }
 
+const ProfitRatioModal = ({ seller, onClose }) => {
+  const { adjustSellerProfitRatio } = useAuth()
+  const hasRatio = seller.profitRatio != null
+  const [percent, setPercent] = useState(String(hasRatio ? Math.round(seller.profitRatio * 100) : 0))
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const step = (delta) => {
+    const cur = parseFloat(percent) || 0
+    const next = Math.min(100, Math.max(0, cur + delta))
+    setPercent(String(next))
+  }
+
+  const save = async () => {
+    setError('')
+    setSuccess('')
+    const value = parseFloat(percent)
+    if (Number.isNaN(value) || value < 0 || value > 100) return setError('Enter a percentage between 0 and 100')
+    const res = await adjustSellerProfitRatio(seller.id, value / 100)
+    if (res.success) {
+      setSuccess('Profit ratio updated')
+      setTimeout(() => { onClose() }, 800)
+    } else {
+      setError(res.error || 'Failed')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75" onClick={onClose}>
+      <div className="w-full max-w-lg bg-white sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between p-6">
+          <div className="flex items-start space-x-3">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Icon name="trending" className="w-7 h-7" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">{seller.shopName || seller.fullName}</p>
+              <h3 className="text-3xl font-black text-gray-900 mt-1">Profit Ratio</h3>
+              <p className="text-gray-500 mt-1 font-medium">
+                {hasRatio ? (
+                  <>Current: <span className="font-black text-gray-800">{Math.round(seller.profitRatio * 100)}%</span> of each order's sale value</>
+                ) : (
+                  'Not set — this seller currently gets a random 18%-20% of each product’s sale value'
+                )}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+            <Icon name="close" className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="px-6 pb-6 space-y-5">
+          <div>
+            <label className="block text-base font-bold text-gray-700 mb-2">Seller's share of each order (%)</label>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => step(-5)}
+                className="w-16 h-16 rounded-2xl bg-white border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-900 font-black text-3xl flex items-center justify-center shrink-0 transition-all"
+              >
+                −
+              </button>
+              <div className="flex-1 relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={percent}
+                  onChange={(e) => setPercent(e.target.value)}
+                  className="w-full px-4 py-5 bg-gray-50 border-2 border-gray-100 rounded-2xl text-4xl font-black text-center text-gray-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                />
+                <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400">%</span>
+              </div>
+              <button
+                onClick={() => step(5)}
+                className="w-16 h-16 rounded-2xl bg-white border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-900 font-black text-3xl flex items-center justify-center shrink-0 transition-all"
+              >
+                +
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-400">
+              Applies to orders given to this seller from now on. This order's profit is credited to their balance once it's marked Delivered.
+            </p>
+          </div>
+
+          {error && <p className="text-rose-600 font-bold">{error}</p>}
+          {success && <p className="text-emerald-600 font-bold">{success}</p>}
+
+          <button
+            onClick={save}
+            className="w-full inline-flex items-center justify-center gap-2 px-5 py-5 rounded-3xl font-black text-xl text-white bg-gradient-to-br from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/20 transition-all"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const ViewsBoosterModal = ({ seller, onClose }) => {
   const { getSellerViews, getSellerCampaigns, startViewsCampaign, pauseViewsCampaign, terminateViewsCampaign, getActiveViewsCampaign, addInstantViews } = useAuth()
   const [tab, setTab] = useState('campaign')
@@ -1683,6 +1785,7 @@ const AdminSellers = () => {
   const [loginHistoryModal, setLoginHistoryModal] = useState(null)
   const [balanceModal, setBalanceModal] = useState(null)
   const [guaranteeModal, setGuaranteeModal] = useState(null)
+  const [profitRatioModal, setProfitRatioModal] = useState(null)
   const [ratingModal, setRatingModal] = useState(null)
   const [productLimitModal, setProductLimitModal] = useState(null)
   const [viewsModal, setViewsModal] = useState(null)
@@ -1694,7 +1797,7 @@ const AdminSellers = () => {
   const [loggingInAs, setLoggingInAs] = useState(null)
   const now = useNow(30 * 1000)
 
-  const anyModalOpen = !!(passwordModal || notifModal || activityModal || loginHistoryModal || balanceModal || guaranteeModal || ratingModal || productLimitModal || viewsModal || suspendModal || blockWdModal || allowRemoveModal || deleteModal)
+  const anyModalOpen = !!(passwordModal || notifModal || activityModal || loginHistoryModal || balanceModal || guaranteeModal || profitRatioModal || ratingModal || productLimitModal || viewsModal || suspendModal || blockWdModal || allowRemoveModal || deleteModal)
   useEffect(() => {
     if (!anyModalOpen) return undefined
     const prev = document.body.style.overflow
@@ -1756,6 +1859,7 @@ const AdminSellers = () => {
     else if (item.id === 'loginHistory') setLoginHistoryModal(item.seller)
     else if (item.id === 'balance') setBalanceModal(item.seller)
     else if (item.id === 'guarantee') setGuaranteeModal(item.seller)
+    else if (item.id === 'profitRatio') setProfitRatioModal(item.seller)
     else if (item.id === 'rating') setRatingModal(item.seller)
     else if (item.id === 'productLimit') setProductLimitModal(item.seller)
     else if (item.id === 'views') setViewsModal(item.seller)
@@ -1834,9 +1938,39 @@ const AdminSellers = () => {
                   onClick={(e) => {
                     if (!e.target.closest('button, a')) setOpenMenuFor(menuOpen ? null : s.id)
                   }}
-                  className={`flex cursor-pointer flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl border bg-white p-4 shadow-sm transition sm:p-5 ${menuOpen ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100 hover:border-gray-200 hover:shadow'} ${s.deleted ? 'opacity-75' : ''}`}
+                  className={`flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2.5 rounded-2xl border bg-white p-3.5 shadow-sm transition sm:gap-x-6 sm:gap-y-4 sm:p-5 ${menuOpen ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100 hover:border-gray-200 hover:shadow'} ${s.deleted ? 'opacity-75' : ''}`}
                 >
-                  <div className="flex min-w-[260px] flex-1 basis-72 items-center gap-4">
+                  {/* Mobile: compact header (avatar + name + balance on one row) and a single badges line */}
+                  <div className="flex w-full items-start gap-3 sm:hidden">
+                    <div className="relative shrink-0">
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${avatarColorFor(s.fullName, s.email)} text-sm font-black text-white shadow-md`}>
+                        {initialsOf(s.fullName)}
+                      </div>
+                      <span title={online ? 'Online now' : `Active ${s.lastActive || 'never'}`} className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-black leading-tight text-gray-900">{s.fullName}</p>
+                      <p className="truncate text-[12.5px] font-medium text-gray-500">{s.email}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-base font-black leading-tight text-gray-900">{money2(s.balance)}</p>
+                      <p className="text-[10.5px] font-medium text-gray-400">Guarantee {money2(s.guarantee)}</p>
+                      {s.profitRatio != null && <p className="text-[10.5px] font-medium text-gray-400">Profit {Math.round(s.profitRatio * 100)}%</p>}
+                    </div>
+                  </div>
+                  <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 sm:hidden">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                      <Icon name="star" className="h-3 w-3 fill-amber-500 text-amber-500" />
+                      {Number(s.rating ?? 5).toFixed(2)}
+                    </span>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide ring-1 ring-inset ${tierTone}`}>{tier}</span>
+                    {online ? <span className="text-[11px] font-bold text-emerald-600">Online</span> : <span className="text-[11px] font-medium text-gray-400">Active {s.lastActive || 'never'}</span>}
+                    {s.withdrawalsBlocked && <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Withdrawals blocked</span>}
+                    <span className="text-[11px] font-medium text-gray-400">Joined {joinedOn(s)}</span>
+                  </div>
+
+                  {/* Desktop: the original wider layout */}
+                  <div className="hidden min-w-[260px] flex-1 basis-72 items-center gap-4 sm:flex">
                     <div className="relative shrink-0">
                       <div className={`flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-gradient-to-br ${avatarColorFor(s.fullName, s.email)} text-lg font-black text-white shadow-md`}>
                         {initialsOf(s.fullName)}
@@ -1859,7 +1993,7 @@ const AdminSellers = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-6">
+                  <div className="hidden items-center gap-6 sm:flex">
                     <div className="space-y-1">
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-sm font-bold text-amber-700">
                         <Icon name="star" className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
@@ -1876,15 +2010,15 @@ const AdminSellers = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                     <button
                       type="button"
                       onClick={() => handleLoginAs(s)}
                       disabled={loggingInAs === s.id}
                       title="Open the seller portal as this seller"
-                      className="inline-flex h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-9 sm:h-11 items-center gap-1.5 sm:gap-2 rounded-xl border border-gray-200 bg-white px-3 sm:px-4 text-xs sm:text-sm font-bold text-gray-900 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <Icon name="login" className="h-[18px] w-[18px]" />
+                      <Icon name="login" className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
                       {loggingInAs === s.id ? 'Opening…' : 'Login'}
                     </button>
                     <div ref={menuOpen ? menuRef : undefined}>
@@ -1898,11 +2032,11 @@ const AdminSellers = () => {
                           setOpenMenuFor(menuOpen ? null : s.id)
                         }}
                         aria-label={`Manage ${s.fullName}`}
-                        className={`flex h-11 w-11 items-center justify-center rounded-xl border transition ${menuOpen ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
+                        className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl border transition ${menuOpen ? 'border-indigo-200 bg-indigo-50 text-indigo-600' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
                         aria-expanded={menuOpen}
                         aria-haspopup="menu"
                       >
-                        <Icon name="dots" className="h-5 w-5" />
+                        <Icon name="dots" className="h-4 w-4 sm:h-5 sm:w-5" />
                       </button>
 
                       {menuOpen && (() => {
@@ -1960,10 +2094,11 @@ const AdminSellers = () => {
                     </div>
                   </div>
 
-                  <div className="ml-auto min-w-[120px] text-right">
+                  <div className="hidden min-w-[120px] text-right sm:ml-auto sm:block">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Balance</p>
                     <p className="text-xl font-black leading-tight text-gray-900">{money2(s.balance)}</p>
                     <p className="text-xs font-medium text-gray-400">Guarantee {money2(s.guarantee)}</p>
+                    {s.profitRatio != null && <p className="text-xs font-medium text-gray-400">Profit ratio {Math.round(s.profitRatio * 100)}%</p>}
                   </div>
                 </div>
               </li>
@@ -1978,6 +2113,7 @@ const AdminSellers = () => {
       {loginHistoryModal && <LoginHistoryModal seller={loginHistoryModal} onClose={() => setLoginHistoryModal(null)} />}
       {balanceModal && <BalanceModal seller={balanceModal} onClose={() => setBalanceModal(null)} />}
       {guaranteeModal && <GuaranteeModal seller={guaranteeModal} onClose={() => setGuaranteeModal(null)} />}
+      {profitRatioModal && <ProfitRatioModal seller={profitRatioModal} onClose={() => setProfitRatioModal(null)} />}
       {ratingModal && <RatingModal seller={ratingModal} onClose={() => setRatingModal(null)} />}
       {productLimitModal && <ProductLimitModal seller={productLimitModal} onClose={() => setProductLimitModal(null)} />}
       {viewsModal && <ViewsBoosterModal seller={viewsModal} onClose={() => setViewsModal(null)} />}

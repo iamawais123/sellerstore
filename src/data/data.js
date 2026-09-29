@@ -114,7 +114,7 @@ const genFeatures = (categoryName) => {
 
 const genSpecs = (categoryName, p) => {
   const base = [
-    S('Brand', 'U Seller Store Premium'),
+    S('Brand', 'Verified Seller Store Premium'),
     S('Model Number', `USS-${p.id.toString().padStart(4, '0')}`)
   ]
   const pool = {

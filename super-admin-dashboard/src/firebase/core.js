@@ -63,6 +63,34 @@ export function getServices(name, { firestore = true, persistent = true } = {}) 
   return result
 }
 
+// A chat photo, shrunk to fit inline in Firestore instead of a Storage upload (this project runs on
+// the free Spark plan, which doesn't include Cloud Storage). Downscales to at most `maxDim` on the
+// longest side and re-encodes as JPEG, stepping the quality down until the result is comfortably
+// under `maxBytes` (Firestore's own field/document limits, and the fact that a whole conversation's
+// message history — every past attachment included — lives in one ~1MB document, make this worth
+// keeping small). Returns a `data:` URL, or throws if even the smallest attempt is still too big.
+export async function compressImageToDataUrl(file, { maxDim = 1280, maxBytes = 180 * 1024 } = {}) {
+  const bitmap = await createImageBitmap(file)
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  try {
+    for (const scale of [1, 0.75, 0.5, 0.35, 0.25]) {
+      const dim = Math.min(maxDim, Math.max(bitmap.width, bitmap.height) * scale)
+      const factor = dim / Math.max(bitmap.width, bitmap.height)
+      canvas.width = Math.max(1, Math.round(bitmap.width * factor))
+      canvas.height = Math.max(1, Math.round(bitmap.height * factor))
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+      for (const quality of [0.72, 0.55, 0.4]) {
+        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        if (dataUrl.length <= maxBytes * 1.37) return dataUrl // base64 runs ~4/3 the byte size
+      }
+    }
+  } finally {
+    bitmap.close?.()
+  }
+  throw new Error('Photo is too large even after compression. Try a different photo.')
+}
+
 // Calls back with the Firebase user (or null) for a named app. A no-op when Firebase isn't
 // configured, so callers never mistake "not configured" for "signed out".
 export function subscribeAuth(name, callback) {

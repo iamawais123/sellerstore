@@ -28,7 +28,7 @@ const Page = ({ title, intro, sections, updated = 'September 2026' }) => (
 export const Privacy = () => (
   <Page
     title="Privacy Policy"
-    intro="This policy explains what information U Seller Store collects when you use the store, how we use it, and the choices you have."
+    intro="This policy explains what information Verified Seller Store collects when you use the store, how we use it, and the choices you have."
     sections={[
       {
         heading: 'Information we collect',
@@ -57,7 +57,7 @@ export const Privacy = () => (
 export const Terms = () => (
   <Page
     title="Terms of Service"
-    intro="By using U Seller Store you agree to these terms. Please read them before placing an order."
+    intro="By using Verified Seller Store you agree to these terms. Please read them before placing an order."
     sections={[
       {
         heading: 'Using the store',

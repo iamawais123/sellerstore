@@ -76,17 +76,67 @@ const DateChip = ({ label }) => (
   </div>
 )
 
-// One message, with a hover menu (copy).
-const Bubble = ({ message }) => {
+const formatBytes = (bytes) => {
+  if (!bytes) return ''
+  const kb = bytes / 1024
+  return kb < 1024 ? `${Math.round(kb)} KB` : `${(kb / 1024).toFixed(1)} MB`
+}
+
+// A photo attached to a message — opens full-size in a new tab. The video/file branches are dead
+// code for now (Composer only ever produces `type: 'image'`, since there's no Cloud Storage to put
+// anything bigger in) but harmless to keep in case that changes later.
+const Attachment = ({ attachment, mine }) => {
+  if (attachment.type === 'image') {
+    return (
+      <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-xl">
+        <img src={attachment.url} alt={attachment.name || 'Photo'} className="max-h-72 w-full object-cover" loading="lazy" />
+      </a>
+    )
+  }
+  if (attachment.type === 'video') {
+    return (
+      <video src={attachment.url} controls preload="metadata" className="max-h-72 w-full rounded-xl bg-black">
+        Your browser can't play this video.
+      </video>
+    )
+  }
+  return (
+    <a
+      href={attachment.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition ${mine ? 'border-white/25 hover:bg-white/10' : 'border-slate-200 hover:bg-slate-50'}`}
+    >
+      <Icon name="file" className={`h-6 w-6 shrink-0 ${mine ? 'text-white' : 'text-slate-500'}`} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{attachment.name || 'File'}</span>
+        {attachment.size > 0 && <span className={`block text-xs ${mine ? 'text-indigo-200' : 'text-slate-400'}`}>{formatBytes(attachment.size)}</span>}
+      </span>
+      <Icon name="download" className={`h-4 w-4 shrink-0 ${mine ? 'text-white' : 'text-slate-400'}`} />
+    </a>
+  )
+}
+
+// One message: attachment and/or text, a hover menu (copy — plus edit/unsend for the admin's own
+// messages), and, once unsent, a muted placeholder instead of its content.
+const Bubble = ({ message, onEdit, onUnsend }) => {
   const mine = message.sender === 'admin'
   const [menu, setMenu] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(message.text || '')
+  const [confirmUnsend, setConfirmUnsend] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const ref = useRef(null)
 
   useEffect(() => {
     if (!menu) return undefined
     const close = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) setMenu(false)
+      if (ref.current && !ref.current.contains(event.target)) {
+        setMenu(false)
+        setConfirmUnsend(false)
+      }
     }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
@@ -105,6 +155,46 @@ const Bubble = ({ message }) => {
     }
   }
 
+  const startEdit = () => {
+    setDraft(message.text || '')
+    setEditing(true)
+    setMenu(false)
+  }
+
+  const saveEdit = async () => {
+    const body = draft.trim()
+    if (!body || busy) return
+    setBusy(true)
+    setError('')
+    const result = await onEdit(message.id, body)
+    setBusy(false)
+    if (result?.success) setEditing(false)
+    else setError(result?.error || 'Could not save this edit.')
+  }
+
+  const unsend = async () => {
+    if (busy) return
+    setBusy(true)
+    const result = await onUnsend(message.id)
+    setBusy(false)
+    setConfirmUnsend(false)
+    setMenu(false)
+    if (!result?.success) setError(result?.error || 'Could not unsend this message.')
+  }
+
+  if (message.deleted) {
+    return (
+      <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+        <div className={`max-w-[75%] rounded-2xl border border-dashed px-4 py-2.5 ${mine ? 'rounded-tr-md border-indigo-200 bg-indigo-50/60' : 'rounded-tl-md border-slate-200 bg-slate-50'}`}>
+          <p className="flex items-center gap-1.5 text-[13px] italic text-slate-400">
+            <Icon name="trash" className="h-3.5 w-3.5" />
+            {mine ? 'You unsent this message' : 'This message was unsent'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`group flex items-start gap-1 ${mine ? 'flex-row-reverse' : ''}`}>
       <div
@@ -112,48 +202,157 @@ const Bubble = ({ message }) => {
           mine ? 'rounded-tr-md bg-indigo-600 text-white' : 'rounded-tl-md border border-slate-200 bg-white text-slate-800'
         }`}
       >
-        <p className="whitespace-pre-wrap break-words text-[15px] font-medium leading-snug">{message.text}</p>
-        <div className={`mt-1 flex items-center justify-end gap-1 text-[11px] ${mine ? 'text-indigo-200' : 'text-slate-400'}`}>
-          <span>{message.time}</span>
-          {mine && <Ticks read={message.read} className={`h-3.5 w-3.5 ${message.read ? 'text-sky-300' : ''}`} />}
-        </div>
-      </div>
-      <div ref={ref} className="relative mt-1.5">
-        <button
-          type="button"
-          onClick={() => setMenu((open) => !open)}
-          aria-label="Message options"
-          className={`rounded-full p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600 focus-visible:opacity-100 group-hover:opacity-100 ${menu ? 'opacity-100' : 'opacity-0'}`}
-        >
-          <Icon name="dots" className="h-4 w-4" strokeWidth={2.6} />
-        </button>
-        {menu && (
-          <div className="absolute left-0 top-7 z-10 w-36 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-xl">
-            <button type="button" onClick={copy} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
-              <Icon name={copied ? 'check' : 'copy'} className="h-4 w-4 text-slate-400" />
-              {copied ? 'Copied' : 'Copy text'}
-            </button>
+        {editing ? (
+          <div className="min-w-[220px] space-y-2">
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              rows={Math.min(6, Math.max(2, draft.split('\n').length))}
+              autoFocus
+              className={`w-full resize-none rounded-lg px-2.5 py-2 text-[15px] font-medium leading-snug focus:outline-none focus:ring-2 ${
+                mine ? 'bg-indigo-700/60 text-white placeholder-indigo-200 focus:ring-white/40' : 'bg-slate-50 text-slate-800 focus:ring-indigo-300'
+              }`}
+            />
+            {error && <p className={`text-xs font-semibold ${mine ? 'text-rose-100' : 'text-rose-600'}`}>{error}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(false)
+                  setError('')
+                }}
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold ${mine ? 'text-indigo-100 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={busy || !draft.trim()}
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold disabled:opacity-50 ${mine ? 'bg-white text-indigo-700' : 'bg-indigo-600 text-white'}`}
+              >
+                {busy ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {message.attachment && (
+              <div className={message.text ? 'mb-2' : ''}>
+                <Attachment attachment={message.attachment} mine={mine} />
+              </div>
+            )}
+            {message.text && <p className="whitespace-pre-wrap break-words text-[15px] font-medium leading-snug">{message.text}</p>}
+            {error && <p className={`mt-1 text-xs font-semibold ${mine ? 'text-rose-100' : 'text-rose-600'}`}>{error}</p>}
+          </>
+        )}
+        {!editing && (
+          <div className={`mt-1 flex items-center justify-end gap-1 text-[11px] ${mine ? 'text-indigo-200' : 'text-slate-400'}`}>
+            {message.editedAt && <span className="italic">Edited</span>}
+            <span>{message.time}</span>
+            {mine && <Ticks read={message.read} className={`h-3.5 w-3.5 ${message.read ? 'text-sky-300' : ''}`} />}
           </div>
         )}
       </div>
+      {!editing && (
+        <div ref={ref} className="relative mt-1.5">
+          <button
+            type="button"
+            onClick={() => setMenu((open) => !open)}
+            aria-label="Message options"
+            className={`rounded-full p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600 focus-visible:opacity-100 group-hover:opacity-100 ${menu ? 'opacity-100' : 'opacity-0'}`}
+          >
+            <Icon name="dots" className="h-4 w-4" strokeWidth={2.6} />
+          </button>
+          {menu && (
+            <div className="absolute left-0 top-7 z-10 w-44 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-xl">
+              {confirmUnsend ? (
+                <div className="px-3 py-2">
+                  <p className="mb-2 text-xs font-semibold text-slate-600">Unsend this message?</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={unsend} disabled={busy} className="flex-1 rounded-lg bg-rose-600 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+                      {busy ? 'Unsending…' : 'Yes, unsend'}
+                    </button>
+                    <button type="button" onClick={() => setConfirmUnsend(false)} className="flex-1 rounded-lg bg-slate-100 py-1.5 text-xs font-bold text-slate-600">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {message.text && (
+                    <button type="button" onClick={copy} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                      <Icon name={copied ? 'check' : 'copy'} className="h-4 w-4 text-slate-400" />
+                      {copied ? 'Copied' : 'Copy text'}
+                    </button>
+                  )}
+                  {mine && onEdit && (
+                    <button type="button" onClick={startEdit} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                      <Icon name="edit" className="h-4 w-4 text-slate-400" />
+                      Edit
+                    </button>
+                  )}
+                  {mine && onUnsend && (
+                    <button type="button" onClick={() => setConfirmUnsend(true)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50">
+                      <Icon name="trash" className="h-4 w-4" />
+                      Unsend
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-export const MessageList = ({ items, listRef }) => (
+export const MessageList = ({ items, listRef, onEdit, onUnsend }) => (
   <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
     <div className="mx-auto flex max-w-3xl flex-col gap-2">
       {items.length === 0 && <p className="my-10 text-center text-sm text-slate-500">No messages yet. Say hello below.</p>}
-      {items.map((item) => (item.type === 'day' ? <DateChip key={item.key} label={item.label} /> : <Bubble key={item.key} message={item.message} />))}
+      {items.map((item) =>
+        item.type === 'day' ? <DateChip key={item.key} label={item.label} /> : <Bubble key={item.key} message={item.message} onEdit={onEdit} onUnsend={onUnsend} />
+      )}
     </div>
   </div>
 )
 
-// The reply box: an auto-growing field (Enter sends, Shift+Enter starts a new line), emoji, and send.
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+
+// A thumbnail/name chip for whatever is queued to send, shown above the text field until sent.
+const PendingAttachment = ({ file, previewUrl, onRemove }) => (
+  <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+    {file.type.startsWith('image/') && previewUrl ? (
+      <img src={previewUrl} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+    ) : (
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400">
+        <Icon name={file.type.startsWith('video/') ? 'play' : 'file'} className="h-5 w-5" />
+      </span>
+    )}
+    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">{file.name}</span>
+    <button type="button" onClick={onRemove} aria-label="Remove attachment" className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600">
+      <Icon name="x" className="h-4 w-4" />
+    </button>
+  </div>
+)
+
+// The reply box: an auto-growing field (Enter sends, Shift+Enter starts a new line), emoji, a photo
+// attach menu (gallery, or a direct "Take Photo" camera option), and send. Photos only, no video or
+// other files — there's no Cloud Storage on the free plan, so an attachment has to be small enough
+// to live inline in the message itself (see `compressImageToDataUrl` in core.js).
 export const Composer = ({ value, onChange, onSend, sending, error, hint }) => {
   const fieldRef = useRef(null)
   const [emojis, setEmojis] = useState(false)
+  const [attachMenu, setAttachMenu] = useState(false)
+  const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [attachError, setAttachError] = useState('')
   const boxRef = useRef(null)
+  const attachRef = useRef(null)
+  const galleryInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
 
   useEffect(() => {
     const field = fieldRef.current
@@ -171,6 +370,26 @@ export const Composer = ({ value, onChange, onSend, sending, error, hint }) => {
     return () => document.removeEventListener('mousedown', close)
   }, [emojis])
 
+  useEffect(() => {
+    if (!attachMenu) return undefined
+    const close = (event) => {
+      if (attachRef.current && !attachRef.current.contains(event.target)) setAttachMenu(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [attachMenu])
+
+  // The preview thumbnail needs an object URL for as long as the file is queued, and no longer.
+  useEffect(() => {
+    if (!file || !file.type.startsWith('image/')) {
+      setPreviewUrl(null)
+      return undefined
+    }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
   const insert = (emoji) => {
     const field = fieldRef.current
     const at = field?.selectionStart ?? value.length
@@ -182,13 +401,59 @@ export const Composer = ({ value, onChange, onSend, sending, error, hint }) => {
     })
   }
 
-  const canSend = !sending && !!value.trim()
+  const pickFile = (event) => {
+    const picked = event.target.files?.[0]
+    event.target.value = ''
+    setAttachMenu(false)
+    if (!picked) return
+    if (picked.size > MAX_ATTACHMENT_BYTES) {
+      setAttachError('That photo is larger than 25 MB.')
+      return
+    }
+    setAttachError('')
+    setFile(picked)
+  }
+
+  const canSend = !sending && (!!value.trim() || !!file)
+
+  const send = () => {
+    if (!canSend) return
+    onSend(file)
+    setFile(null)
+    setAttachError('')
+  }
 
   return (
     <div className="border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
       {error && <p className="mb-2 text-sm font-semibold text-red-600">{error}</p>}
+      {attachError && <p className="mb-2 text-sm font-semibold text-red-600">{attachError}</p>}
       {hint && <p className="mb-2 text-xs font-medium text-slate-400">{hint}</p>}
+      {file && <PendingAttachment file={file} previewUrl={previewUrl} onRemove={() => setFile(null)} />}
       <div className="mx-auto flex max-w-3xl items-end gap-3">
+        <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={pickFile} />
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={pickFile} />
+        <div ref={attachRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setAttachMenu((open) => !open)}
+            aria-label="Attach a photo"
+            className={`mb-0.5 flex h-11 w-11 items-center justify-center rounded-full transition ${attachMenu ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
+          >
+            <Icon name="paperclip" className="h-5 w-5" />
+          </button>
+          {attachMenu && (
+            <div className="absolute bottom-full left-0 z-10 mb-2 w-52 overflow-hidden rounded-2xl border border-slate-100 bg-white py-1 shadow-xl">
+              <button type="button" onClick={() => galleryInputRef.current?.click()} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <Icon name="file" className="h-[18px] w-[18px] text-slate-400" />
+                Choose photo
+              </button>
+              <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <Icon name="camera" className="h-[18px] w-[18px] text-slate-400" />
+                Take photo
+              </button>
+            </div>
+          )}
+        </div>
         <div ref={boxRef} className="relative flex min-w-0 flex-1 items-end rounded-3xl border-2 border-indigo-300 bg-white px-4 py-1.5 transition focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10">
           <textarea
             ref={fieldRef}
@@ -198,7 +463,7 @@ export const Composer = ({ value, onChange, onSend, sending, error, hint }) => {
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault()
-                if (canSend) onSend()
+                send()
               }
             }}
             placeholder="Type a message..."
@@ -221,7 +486,7 @@ export const Composer = ({ value, onChange, onSend, sending, error, hint }) => {
         </div>
         <button
           type="button"
-          onClick={onSend}
+          onClick={send}
           disabled={!canSend}
           aria-label="Send message"
           className={`mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition ${canSend ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30 hover:bg-indigo-700' : 'cursor-not-allowed bg-slate-300'}`}
