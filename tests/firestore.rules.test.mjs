@@ -574,3 +574,67 @@ describe('reading accounts', () => {
     await assertFails(getDocs(collection(db(), 'users')))
   })
 })
+
+describe('Telegram link (adminTelegram)', () => {
+  const link = {
+    adminId: 'a1',
+    chatId: 4242,
+    chatName: 'Ada Admin',
+    chatType: 'private',
+    enabled: true,
+    prefs: { activity: true, support: true, logins: false },
+    cursor: { activity: now, support: now, logins: null },
+    sent: [],
+    linkedAt: now,
+  }
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), 'adminTelegram/a1'), link))
+  })
+
+  it('shows the link to its admin and to the owner, and to nobody else', async () => {
+    await assertSucceeds(getDoc(doc(db('a1'), 'adminTelegram/a1')))
+    await assertSucceeds(getDoc(doc(db('sa1'), 'adminTelegram/a1')))
+    await assertFails(getDoc(doc(db('s1'), 'adminTelegram/a1')))
+    await assertFails(getDoc(doc(db('c1'), 'adminTelegram/a1')))
+    await assertFails(getDoc(doc(db(), 'adminTelegram/a1')))
+    await assertFails(getDocs(collection(db('a1'), 'adminTelegram')))
+  })
+
+  it('lets the admin switch alerts on and off, and choose what they get', async () => {
+    const s = db('a1')
+    await assertSucceeds(updateDoc(doc(s, 'adminTelegram/a1'), { enabled: false }))
+    await assertSucceeds(updateDoc(doc(s, 'adminTelegram/a1'), { enabled: true, prefs: { activity: false, support: true, logins: true } }))
+  })
+
+  it('keeps everything else for the relay: chat, cursors and history cannot be edited', async () => {
+    const s = db('a1')
+    for (const changes of [{ chatId: 1 }, { chatName: 'Someone' }, { cursor: {} }, { sent: [] }, { adminId: 'a2' }, { lastError: null }]) {
+      await assertFails(updateDoc(doc(s, 'adminTelegram/a1'), changes))
+    }
+  })
+
+  it('accepts only the three known choices, each a true/false', async () => {
+    const s = db('a1')
+    await assertFails(updateDoc(doc(s, 'adminTelegram/a1'), { prefs: { activity: true, support: true } }))
+    await assertFails(updateDoc(doc(s, 'adminTelegram/a1'), { prefs: { activity: true, support: true, logins: false, extra: true } }))
+    await assertFails(updateDoc(doc(s, 'adminTelegram/a1'), { prefs: { activity: 'yes', support: true, logins: false } }))
+    await assertFails(updateDoc(doc(s, 'adminTelegram/a1'), { enabled: 'yes' }))
+  })
+
+  it('refuses anyone else\'s changes, and any create or delete from a browser', async () => {
+    await assertFails(updateDoc(doc(db('sa1'), 'adminTelegram/a1'), { enabled: false }))
+    await assertFails(updateDoc(doc(db('s1'), 'adminTelegram/a1'), { enabled: false }))
+    await assertFails(setDoc(doc(db('a1'), 'adminTelegram/a1'), link))
+    await assertFails(deleteDoc(doc(db('a1'), 'adminTelegram/a1')))
+    await env.withSecurityRulesDisabled(async (ctx) => deleteDoc(doc(ctx.firestore(), 'adminTelegram/a1')))
+    await assertFails(setDoc(doc(db('a1'), 'adminTelegram/a1'), link))
+  })
+
+  it('keeps the one-time link codes out of every browser\'s reach', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), 'telegramLinks/code1'), { adminId: 'a1', expiresAt: now }))
+    for (const uid of ['a1', 'sa1', 's1']) {
+      await assertFails(getDoc(doc(db(uid), 'telegramLinks/code1')))
+      await assertFails(setDoc(doc(db(uid), 'telegramLinks/mine'), { adminId: uid, expiresAt: now }))
+    }
+  })
+})

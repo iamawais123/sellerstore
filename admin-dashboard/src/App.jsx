@@ -10,6 +10,7 @@ import AdminSupport from './pages/admin/AdminSupport'
 import AdminWithdrawals from './pages/admin/AdminWithdrawals'
 import AdminRecentActions from './pages/admin/AdminRecentActions'
 import AdminMyLogs from './pages/admin/AdminMyLogs'
+import AdminTelegram from './pages/admin/AdminTelegram'
 
 const ProtectedRoute = ({ children }) => {
   const { isAdminLoggedIn } = useAuth()
@@ -54,6 +55,7 @@ function App() {
             <Route path="withdrawals" element={<AdminWithdrawals />} />
             <Route path="recent-actions" element={<AdminRecentActions />} />
             <Route path="my-logs" element={<AdminMyLogs />} />
+            <Route path="telegram" element={<AdminTelegram />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

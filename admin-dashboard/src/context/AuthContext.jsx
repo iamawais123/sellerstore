@@ -450,6 +450,24 @@ export function AuthProvider({ children }) {
 
   const backfillLocations = (rows) => shopData.backfillLocations(acting().db, rows)
 
+  // ---- Telegram alerts ----------------------------------------------------------------------------------
+  // A super admin looking in through "log in as admin" can see the link but not change it.
+  const watchTelegram = (onData, onError) => shopData.watchTelegram(acting().db, admin.id, onData, onError)
+
+  const telegramLocked = { success: false, error: 'Telegram alerts can only be changed by the admin themselves.' }
+
+  const saveTelegramSettings = async (settings) => {
+    if (impersonatedNow) return telegramLocked
+    const { db } = acting()
+    const result = await shopData.saveTelegramSettings(db, admin.id, settings)
+    // Lets the relay start (or stop) counting right now, so what happens next is what gets sent, not what is already there.
+    if (result.success) shopData.telegramRequest(db, 'sync')
+    return result
+  }
+
+  // 'link' (start connecting), 'test' or 'disconnect'.
+  const telegramAction = (action) => (impersonatedNow ? Promise.resolve(telegramLocked) : shopData.telegramRequest(acting().db, action))
+
   const getSellerLedger = (sellerId) => ledgerBySeller[sellerId] || EMPTY
 
   const adjustSellerBalance = (sellerId, amount, action) =>
@@ -676,6 +694,9 @@ export function AuthProvider({ children }) {
         watchDeviceLabels,
         saveDeviceLabel,
         backfillLocations,
+        watchTelegram,
+        saveTelegramSettings,
+        telegramAction,
         getSellersForAdmin,
         getAllSellersCount,
         getPendingKYCCount,

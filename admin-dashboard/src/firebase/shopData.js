@@ -26,7 +26,8 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore'
-import { fail, memberSinceLabel } from './core.js'
+import { getAuth } from 'firebase/auth'
+import { fail, memberSinceLabel, useEmulator } from './core.js'
 
 export { limit, orderBy, where } from 'firebase/firestore'
 
@@ -46,6 +47,7 @@ export const COL = {
   superLogs: 'superAdminLogs',
   adminLogins: 'adminLoginHistory',
   adminDevices: 'adminDevices',
+  adminTelegram: 'adminTelegram',
   security: 'sellerSecurity',
 }
 
@@ -76,7 +78,10 @@ const refuse = (message) => {
 
 async function attempt(task) {
   try {
-    return await task()
+    const result = await task()
+    // Whatever just committed may be news for the admin's Telegram (see markTelegramNews).
+    if (result?.success) flushTelegramSync()
+    return result
   } catch (error) {
     return fail(error instanceof Refusal ? error.message : error)
   }
@@ -223,6 +228,7 @@ export const sortNewest = (list, field = 'createdAt') => [...list].sort(byNewest
 // `meta` carries what the admin's feed shows beyond the headline: the products in an "added to shop"
 // line, the payout method of a withdrawal, the place and device of a sign-up.
 export function stageActivity(db, writer, { adminId, sellerId, actorId, type, title, entity, icon, amount, meta }) {
+  if (actorId && actorId === sellerId) markTelegramNews(db)
   const ref = doc(collection(db, COL.activity))
   writer.set(ref, clean({ adminId, sellerId, actorId, type, title, entity, icon, amount, meta: meta && Object.keys(clean(meta)).length ? clean(meta) : undefined, at: nowIso() }))
 }
@@ -232,6 +238,10 @@ export async function pushActivity(db, entry) {
   try {
     const ref = doc(collection(db, COL.activity))
     await setDoc(ref, clean({ ...entry, at: nowIso() }))
+    if (entry.actorId && entry.actorId === entry.sellerId) {
+      markTelegramNews(db)
+      flushTelegramSync()
+    }
   } catch (_) {}
 }
 
@@ -367,6 +377,73 @@ export const saveDeviceLabel = (db, adminId, key, label) =>
     return { success: true, label: name }
   })
 
+// ---- admin: Telegram alerts -----------------------------------------------------------------------
+// An admin can link a Telegram chat and get their dashboard's notifications there. The link itself is
+// made and kept by the relay in api/ (see api/telegram.js: it runs on Vercel, with the bot token); the
+// admin only reads it and switches things on and off here.
+
+export const DEFAULT_TELEGRAM_PREFS = { activity: true, support: true, logins: false }
+
+// Calls back with the admin's link (`{ chatName, enabled, prefs, ... }`), or null while none is connected.
+export function watchTelegram(db, adminId, onData, onError = () => {}) {
+  return onSnapshot(
+    doc(db, COL.adminTelegram, adminId),
+    (snap) => onData(snap.exists() ? snap.data() : null),
+    (error) => onError(error, COL.adminTelegram)
+  )
+}
+
+export const saveTelegramSettings = (db, adminId, { enabled, prefs = {} }) =>
+  attempt(async () => {
+    const chosen = { ...DEFAULT_TELEGRAM_PREFS, ...prefs }
+    await updateDoc(doc(db, COL.adminTelegram, adminId), {
+      enabled: !!enabled,
+      prefs: { activity: !!chosen.activity, support: !!chosen.support, logins: !!chosen.logins },
+    })
+    return { success: true }
+  })
+
+// Asks the relay to do something for the signed-in person: 'link', 'test' or 'disconnect' (an admin), or
+// 'sync' (see below). Never throws; the answer is `{ success, ... }` like every other call here.
+export async function telegramRequest(db, action, { keepalive = false } = {}) {
+  try {
+    const token = await getAuth(db.app).currentUser?.getIdToken()
+    if (!token) return { success: false, error: 'Sign in again to use Telegram alerts.' }
+    const response = await fetch('/api/telegram', {
+      method: 'POST',
+      keepalive,
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action }),
+    })
+    const body = await response.json().catch(() => null)
+    if (!body) return { success: false, error: 'The Telegram relay is not available here. It runs on the deployed site.' }
+    return body.success ? body : { success: false, error: body.error || 'The Telegram request failed.', notConfigured: !!body.notConfigured }
+  } catch (_) {
+    return { success: false, error: 'Could not reach the server. Check your connection and try again.' }
+  }
+}
+
+// When a seller does something their admin should hear about, the relay is told shortly after it has
+// committed, and it sends whatever is new to the admin's Telegram. Marking happens where the record is
+// written; the telling happens once the write has gone through (an `attempt` that succeeded, or right after
+// a direct write), and a burst of actions shares one call. A no-op outside a browser and on the emulators.
+let newsDb = null
+let syncTimer = null
+
+const markTelegramNews = (db) => {
+  newsDb = db
+}
+
+function flushTelegramSync() {
+  if (!newsDb || syncTimer || typeof window === 'undefined' || useEmulator) return
+  syncTimer = setTimeout(() => {
+    const db = newsDb
+    newsDb = null
+    syncTimer = null
+    telegramRequest(db, 'sync', { keepalive: true })
+  }, 400)
+}
+
 // Entries that have an address but no place (the lookup failed at the time, or the service was down):
 // look the address up now and store the place on the entry. `rows` are `{ collection, id, ip }`.
 export async function backfillLocations(db, rows) {
@@ -431,6 +508,8 @@ export async function recordSellerLogin(db, shop, { device = describeDevice(), w
     batch.update(doc(db, COL.shops, shop.id), { lastActiveAt: at })
     batch.set(doc(collection(db, COL.loginHistory)), clean({ sellerId: shop.id, adminId: shop.adminId, at, device, ip: found?.ip || undefined, location: found?.location || undefined }))
     await batch.commit()
+    markTelegramNews(db)
+    flushTelegramSync()
   } catch (_) {}
 }
 
@@ -887,6 +966,7 @@ async function pushChatNotification(db, shop, sender, body) {
         recipient: toAdmin ? 'admin' : undefined,
       })
     )
+    if (toAdmin) markTelegramNews(db)
   } catch (_) {}
 }
 

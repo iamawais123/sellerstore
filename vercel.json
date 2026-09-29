@@ -15,6 +15,6 @@
   "rewrites": [
     { "source": "/admin-app/:path*", "destination": "/admin-app/index.html" },
     { "source": "/super-admin-app/:path*", "destination": "/super-admin-app/index.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

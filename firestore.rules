@@ -13,6 +13,8 @@ rules_version = '2';
 //   loginHistory, activityLogs      every doc carries `sellerId` and the owning admin's `adminId`
 //   superAdminLogs, adminLoginHistory   super-admin console audit trail
 //   adminDevices/{adminId}   the names an admin gave their sign-in devices
+//   adminTelegram/{adminId}  an admin's Telegram link (made by the relay in api/; the admin only switches things on/off)
+//   telegramLinks/{code}     one-time connect codes: no rule on purpose — only the relay (Admin SDK) ever touches them
 //
 // Who may do what: a seller reads and writes their own shop data; an admin manages the sellers who
 // joined through their invite code (`adminId == their uid`); a super admin manages everything.
@@ -664,6 +666,25 @@ service cloud.firestore {
         && request.resource.data.labels is map
         && request.resource.data.labels.size() <= 100;
       allow delete: if false;
+    }
+
+    // An admin's Telegram link: { chatId, chatName, enabled, prefs: { activity, support, logins }, ... }.
+    // The Telegram relay (api/, running with the Admin SDK) creates, updates and deletes it as the
+    // admin connects; the admin can only read it and switch things on and off. Nothing in it is a secret
+    // (the bot token lives in the relay's environment), but the chat is theirs alone to see.
+    match /adminTelegram/{adminId} {
+      allow get: if signedIn() && (isOwner() || (isSuperAdmin() && ownsAdmin(adminId)) || (isAdmin() && request.auth.uid == adminId));
+      allow list: if false;
+      allow update: if signedIn() && isAdmin() && request.auth.uid == adminId
+        && diffKeys().hasOnly(['enabled', 'prefs'])
+        && request.resource.data.enabled is bool
+        && request.resource.data.prefs is map
+        && request.resource.data.prefs.keys().hasOnly(['activity', 'support', 'logins'])
+        && request.resource.data.prefs.keys().hasAll(['activity', 'support', 'logins'])
+        && request.resource.data.prefs.activity is bool
+        && request.resource.data.prefs.support is bool
+        && request.resource.data.prefs.logins is bool;
+      allow create, delete: if false;
     }
   }
 }
