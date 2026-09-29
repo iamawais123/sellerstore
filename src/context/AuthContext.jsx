@@ -575,13 +575,6 @@ export function AuthProvider({ children }) {
     return shopData.payOrder(db, sellerRef.current.id, orderId, actorId)
   }
 
-  const advanceSellerOrderStatus = async (orderId, newStatus) => {
-    const problem = needSeller()
-    if (problem) return problem
-    const { db } = acting()
-    return shopData.sellerAdvanceOrderStatus(db, sellerRef.current.id, orderId, newStatus)
-  }
-
   // ---- seller shop catalog (the master catalog products a seller has added to their shop) ----------
 
   const getMasterCatalog = () => masterCatalog
@@ -710,7 +703,6 @@ export function AuthProvider({ children }) {
         removeProductFromShop,
         clearShopProducts,
         paySellerOrder,
-        advanceSellerOrderStatus,
       }}
     >
       {children}

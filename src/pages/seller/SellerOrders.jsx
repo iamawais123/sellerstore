@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`
@@ -181,10 +181,8 @@ const OrderCard = ({ order, seller, onPay }) => {
   )
 }
 
-const ORDER_FLOW = ['Unpaid', 'Paid', 'Pickup', 'On the way', 'Out for delivery', 'Delivered']
-
 const SellerOrders = () => {
-  const { seller, getSellerOrders, paySellerOrder, advanceSellerOrderStatus, getSellerNotifications, markNotificationRead } = useAuth()
+  const { seller, getSellerOrders, paySellerOrder, getSellerNotifications, markNotificationRead } = useAuth()
   const [status, setStatus] = useState('All')
   const orders = getSellerOrders(seller.id)
   const visibleOrders = useMemo(() => orders.filter((order) => status === 'All' || order.status === status), [orders, status])
@@ -194,33 +192,6 @@ const SellerOrders = () => {
     const unread = getSellerNotifications().filter((n) => !n.read && n.type === 'order')
     unread.forEach((n) => markNotificationRead(seller.id, n.id))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Track which orders have an in-flight advance so we don't fire duplicate requests
-  const advancing = useRef(new Set())
-
-  // Auto-advance paid orders through delivery stages based on stageTimestamps
-  useEffect(() => {
-    const advance = () => {
-      const now = Date.now()
-      orders.forEach((order) => {
-        if (!order.stageTimestamps || order.status === 'Delivered' || order.status === 'Cancelled' || order.status === 'Unpaid') return
-        if (advancing.current.has(order.id)) return
-        const currentIdx = ORDER_FLOW.indexOf(order.status)
-        if (currentIdx === -1 || currentIdx >= ORDER_FLOW.length - 1) return
-        const nextStatus = ORDER_FLOW[currentIdx + 1]
-        const nextAt = order.stageTimestamps[nextStatus]
-        if (nextAt && now >= new Date(nextAt).getTime()) {
-          advancing.current.add(order.id)
-          advanceSellerOrderStatus(order.id, nextStatus).finally(() => {
-            advancing.current.delete(order.id)
-          })
-        }
-      })
-    }
-    advance()
-    const timer = setInterval(advance, 30_000)
-    return () => clearInterval(timer)
-  }, [orders]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePay = (orderId) => paySellerOrder(seller.id, orderId)
 

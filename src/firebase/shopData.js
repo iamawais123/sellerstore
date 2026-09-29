@@ -618,39 +618,6 @@ export const submitKyc = (db, shop, { docType, front, back }) =>
 
 // ---- seller: orders, wallet, catalogue ----------------------------------------------------------
 
-// Auto-advances a seller's own paid order one stage through the delivery flow.
-// Deliberately minimal (no notifications / activity logs) so the seller has permission to call it.
-// On Delivered: credits the profit back into the shop balance and updates orderStats.
-const DELIVERY_NEXT = { Paid: 'Pickup', Pickup: 'On the way', 'On the way': 'Out for delivery', 'Out for delivery': 'Delivered' }
-
-export const sellerAdvanceOrderStatus = (db, sellerId, orderId, newStatus) =>
-  attempt(() =>
-    runTransaction(db, async (tx) => {
-      const shopRef = doc(db, COL.shops, sellerId)
-      const orderRef = doc(db, COL.orders, orderId)
-      const [shopSnap, orderSnap] = [await tx.get(shopRef), await tx.get(orderRef)]
-      if (!shopSnap.exists()) refuse('Seller not found')
-      if (!orderSnap.exists() || orderSnap.data().sellerId !== sellerId) refuse('Order not found')
-      const shop = shopSnap.data()
-      const order = orderSnap.data()
-
-      // Guard: only advance to the correct next stage (prevents race-condition double-advances)
-      if (DELIVERY_NEXT[order.status] !== newStatus) return { success: true }
-
-      const orderChanges = { status: newStatus, updatedAt: nowIso() }
-      if (newStatus === 'Delivered' && !order.profitCredited) {
-        orderChanges.profitCredited = true
-        const stats = { total: 0, pending: 0, delivered: 0, ...(shop.orderStats || {}) }
-        tx.update(shopRef, {
-          balance: round2((shop.balance || 0) + (order.profit || 0)),
-          orderStats: { ...stats, pending: Math.max(0, stats.pending - 1), delivered: stats.delivered + 1 },
-        })
-      }
-      tx.update(orderRef, orderChanges)
-      return { success: true }
-    })
-  )
-
 // The seller pays an order's cost out of their shop balance; the order becomes "Paid".
 export const payOrder = (db, sellerId, orderId, actorId = sellerId) =>
   attempt(() =>
@@ -664,14 +631,7 @@ export const payOrder = (db, sellerId, orderId, actorId = sellerId) =>
       const order = orderSnap.data()
       if (order.status !== 'Unpaid') refuse('This order has already been processed')
       if ((shop.balance || 0) < order.cost) refuse('Your shop balance is too low. Top up your wallet to process this order.')
-      const paidMs = Date.now()
-      const stageTimestamps = {
-        Pickup: new Date(paidMs + 1 * 60 * 1000).toISOString(),
-        'On the way': new Date(paidMs + 3 * 60 * 1000).toISOString(),
-        'Out for delivery': new Date(paidMs + 6 * 60 * 1000).toISOString(),
-        Delivered: new Date(paidMs + 10 * 60 * 1000).toISOString(),
-      }
-      tx.update(orderRef, { status: 'Paid', paidAt: nowIso(), stageTimestamps })
+      tx.update(orderRef, { status: 'Paid', paidAt: nowIso() })
       tx.update(shopRef, { balance: round2((shop.balance || 0) - order.cost) })
       stageActivity(db, tx, { adminId: shop.adminId, sellerId, actorId, type: 'order_paid', title: 'Paid to process order', entity: shop.fullName, icon: 'pay', amount: order.cost })
       return { success: true }
