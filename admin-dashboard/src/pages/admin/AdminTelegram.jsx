@@ -6,7 +6,7 @@ import { Icon } from '../../components/activity/icons'
 // What can be switched on and off, in the order shown. The keys are the ones the relay understands (api/_lib/sync.js).
 const KINDS = [
   { key: 'activity', title: 'Seller activity', hint: "New sign-ups and KYC resubmissions (with the seller's details and their ID photos and PDFs), order payments, withdrawal requests, payout methods and product changes." },
-  { key: 'support', title: 'Support messages', hint: 'A message a seller writes to you in support chat.' },
+  { key: 'support', title: 'Support messages', hint: "A message a seller writes to you in support chat, and any photo they send with it." },
   { key: 'logins', title: 'Seller sign-ins', hint: 'Every time a seller logs in. Handy, but it can get chatty.' },
 ]
 

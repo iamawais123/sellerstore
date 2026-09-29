@@ -15,6 +15,7 @@
 //
 // A lost ping is harmless: the next one finds everything after the cursor.
 import { composeMessages, renderActivity, renderLogin, renderSupport } from './format.js'
+import { sendChatPhoto } from './chatPhoto.js'
 import { KYC_TYPES, sendKyc } from './kyc.js'
 import { isChatGone, sendStoredFile } from './telegram.js'
 
@@ -25,9 +26,17 @@ const LOOKBACK_MS = 10 * 60 * 1000
 const FETCH_LIMIT = 40
 const REMEMBER = 300
 
-// The ids one record is remembered by. A sign-up or KYC resubmission also brings its KYC package (details and
-// identity documents), which is sent, retried and remembered on its own.
-const idsOf = (source, id, row) => [`${source.key}:${id}`, ...(source.key === 'activity' && KYC_TYPES.has(row.type) ? [`kyc:${id}`] : [])]
+// What a record brings along besides its alert: a sign-up or KYC resubmission brings the seller's KYC (details and
+// identity documents), a support message may bring the photo the seller attached. Each is sent, retried and
+// remembered on its own (its own id in the list of sent ids), so a failure never repeats the alert.
+const EXTRAS = {
+  activity: (row) => (KYC_TYPES.has(row.type) ? 'kyc' : null),
+  support: () => 'photo',
+}
+const extraOf = (source, row) => EXTRAS[source.key]?.(row) || null
+
+// The ids one record is remembered by.
+const idsOf = (source, id, row) => [`${source.key}:${id}`, ...(extraOf(source, row) ? [`${extraOf(source, row)}:${id}`] : [])]
 
 const byAdmin = (collection, adminId) => collection.where('adminId', '==', adminId)
 
@@ -131,7 +140,8 @@ export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, 
       // A clock that runs ahead must not push the cursor into the future and hide what comes next.
       newest = later(newest, at > nowIso ? nowIso : at)
       candidates.push({ id: `${source.key}:${doc.id}`, source, row, at })
-      if (idsOf(source, doc.id, row).length > 1) candidates.push({ id: `kyc:${doc.id}`, source, row, at, kyc: true })
+      const extra = extraOf(source, row)
+      if (extra) candidates.push({ id: `${extra}:${doc.id}`, source, row, at, extra })
     }
     after[source.key] = newest
   }
@@ -153,8 +163,8 @@ export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, 
   })
   if (!claimed.length) return { sent: 0 }
 
-  const alerts = claimed.filter((item) => !item.kyc).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
-  const packages = claimed.filter((item) => item.kyc)
+  const alerts = claimed.filter((item) => !item.extra).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+  const packages = claimed.filter((item) => item.extra).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
   const gone = async () => {
     // Blocked the bot or removed it from the group: stop trying, and tell the admin on the page.
     await ref.update({ enabled: false, lastError: 'Telegram says the bot can no longer message this chat. Connect again to keep getting alerts.', lastErrorAt: nowIso })
@@ -176,12 +186,18 @@ export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, 
     }
   }
 
-  // Then each new seller's KYC. One that fails is put back on its own, so the alerts above are never sent twice.
+  // Then what came along: a new seller's KYC, a photo from a chat. One that fails is put back on its own, so the
+  // alerts above are never sent twice.
   const failed = []
   let firstError = null
+  const done = { kyc: 0, photos: 0 }
   for (const item of packages) {
     try {
-      await sendKyc({ db, adminId, sellerId: item.row.sellerId, chatId: link.chatId, send, sendFile, dashboardUrl })
+      if (item.extra === 'kyc') {
+        if (await sendKyc({ db, adminId, sellerId: item.row.sellerId, chatId: link.chatId, send, sendFile, dashboardUrl })) done.kyc += 1
+      } else if (await sendChatPhoto({ db, adminId, note: item.row, chatId: link.chatId, sendFile })) {
+        done.photos += 1
+      }
     } catch (error) {
       if (isChatGone(error)) return gone()
       failed.push(item)
@@ -194,7 +210,7 @@ export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, 
   }
 
   if (link.lastError) await ref.update({ lastError: null, lastErrorAt: null })
-  return packages.length ? { sent: alerts.length, kyc: packages.length } : { sent: alerts.length }
+  return { sent: alerts.length, ...(done.kyc ? { kyc: done.kyc } : {}), ...(done.photos ? { photos: done.photos } : {}) }
 }
 
 // A send that failed for a passing reason: put the records back so the next look sends them.

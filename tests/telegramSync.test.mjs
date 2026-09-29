@@ -603,3 +603,148 @@ describe('uploading a stored picture or PDF to Telegram', () => {
     assert.equal(calls.length, 0)
   })
 })
+
+describe('a photo a seller sends in support chat', () => {
+  const PHOTO = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9, 9]).toString('base64')}`
+  const PHOTO_2 = `data:image/png;base64,${Buffer.from([0x89, 0x50, 0x4e, 0x47, 7, 7]).toString('base64')}`
+  let files
+  let failFileWith
+
+  const sendFile = async (chatId, dataUrl, options) => {
+    if (failFileWith?.(options)) throw failFileWith(options)
+    files.push({ chatId, dataUrl, ...options })
+    return true
+  }
+  const syncChat = () => syncAdmin({ db, adminId: 'a1', send, sendFile, now: () => clock })
+
+  // The seller's conversation, and the notification raised right after each message (as the app does).
+  const conversation = (messages, extra = {}) => db.seed('supportConversations', 'support-s1', { sellerId: 's1', adminId: 'a1', status: 'active', messages, ...extra })
+  const message = (id, secondsAt, { text = '', attachment, sender = 'seller' } = {}) => ({ id, sender, text, ...(attachment ? { attachment } : {}), at: at(secondsAt) })
+  const image = (url) => ({ type: 'image', url, name: 'photo.jpg', contentType: 'image/jpeg', size: 100 })
+  const note = (id, secondsAt, text) =>
+    db.seed('notifications', id, { adminId: 'a1', sellerId: 's1', type: 'chat', recipient: 'admin', title: 'New message from Ali Stores', message: text, createdAt: at(secondsAt), read: false })
+
+  beforeEach(() => {
+    files = []
+    failFileWith = null
+  })
+
+  it('sends the real photo right after the alert that only says "Photo"', async () => {
+    connect()
+    conversation([message('m1', 20, { attachment: image(PHOTO) })])
+    note('n1', 20.5, '📷 Photo')
+    assert.deepEqual(await syncChat(), { sent: 1, photos: 1 })
+
+    assert.match(sent[0].html, /New message from Ali Stores/)
+    assert.match(sent[0].html, /📷 Photo/)
+    assert.equal(files.length, 1)
+    assert.equal(files[0].dataUrl, PHOTO)
+    assert.equal(files[0].chatId, 4242)
+    assert.match(files[0].caption, /Photo from Ali Stores/)
+  })
+
+  it('sends a photo that came with a written message too', async () => {
+    connect()
+    conversation([message('m1', 20, { text: 'This is my ID', attachment: image(PHOTO) })])
+    note('n1', 20.5, 'This is my ID')
+    assert.deepEqual(await syncChat(), { sent: 1, photos: 1 })
+    assert.match(sent[0].html, /This is my ID/)
+    assert.equal(files[0].dataUrl, PHOTO)
+  })
+
+  it('sends it once', async () => {
+    connect()
+    conversation([message('m1', 20, { attachment: image(PHOTO) })])
+    note('n1', 20.5, '📷 Photo')
+    await syncChat()
+    assert.deepEqual(await syncChat(), { sent: 0 })
+    assert.equal(files.length, 1)
+  })
+
+  it('sends each photo of several, and none for a plain text message that follows', async () => {
+    connect()
+    conversation([
+      message('m1', 10, { attachment: image(PHOTO) }),
+      message('m2', 20, { attachment: image(PHOTO_2) }),
+      message('m3', 30, { text: 'thanks' }),
+    ])
+    note('n1', 10.5, '📷 Photo')
+    note('n2', 20.5, '📷 Photo')
+    note('n3', 30.5, 'thanks')
+    assert.deepEqual(await syncChat(), { sent: 3, photos: 2 })
+    assert.deepEqual(files.map((f) => f.dataUrl), [PHOTO, PHOTO_2])
+  })
+
+  it('sends nothing extra for a text-only message', async () => {
+    connect()
+    conversation([message('m1', 20, { text: 'hello' })])
+    note('n1', 20.5, 'hello')
+    assert.deepEqual(await syncChat(), { sent: 1 })
+    assert.equal(files.length, 0)
+  })
+
+  it('does not attach an earlier photo to a later text message', async () => {
+    connect()
+    // The photo's own notification is not part of this look; only the text message after it is.
+    conversation([message('m1', 1, { attachment: image(PHOTO) }), message('m2', 50, { text: 'hello?' })])
+    note('n2', 50.5, 'hello?')
+    assert.deepEqual(await syncChat(), { sent: 1 })
+    assert.equal(files.length, 0)
+  })
+
+  it('does not match a message that is more than a minute older than its notification', async () => {
+    connect()
+    conversation([message('m1', 1, { attachment: image(PHOTO) })])
+    note('n1', 100, 'late')
+    clock = T0 + 200_000
+    assert.deepEqual(await syncChat(), { sent: 1 })
+    assert.equal(files.length, 0)
+  })
+
+  it('never sends a photo from another admin\'s seller', async () => {
+    connect()
+    conversation([message('m1', 20, { attachment: image(PHOTO) })], { adminId: 'a2' })
+    note('n1', 20.5, '📷 Photo')
+    assert.deepEqual(await syncChat(), { sent: 1 })
+    assert.equal(files.length, 0)
+  })
+
+  it('ignores what the admin wrote in the same conversation', async () => {
+    connect()
+    conversation([message('m0', 19, { sender: 'admin', attachment: image(PHOTO_2) }), message('m1', 20, { text: 'ok' })])
+    note('n1', 20.5, 'ok')
+    assert.deepEqual(await syncChat(), { sent: 1 })
+    assert.equal(files.length, 0)
+  })
+
+  it('retries just the photo, without repeating the alert, when the upload fails', async () => {
+    connect()
+    conversation([message('m1', 20, { attachment: image(PHOTO) })])
+    note('n1', 20.5, '📷 Photo')
+    failFileWith = () => Object.assign(new Error('Bad Gateway'), { code: 502 })
+    await assert.rejects(syncChat(), /Bad Gateway/)
+    assert.equal(sent.length, 1)
+
+    failFileWith = null
+    assert.deepEqual(await syncChat(), { sent: 0, photos: 1 })
+    assert.equal(sent.length, 1, 'the alert is not sent again')
+    assert.equal(files.length, 1)
+  })
+
+  it('does not send a photo from before it was connected', async () => {
+    conversation([message('m1', 20, { attachment: image(PHOTO) })])
+    note('n1', 20.5, '📷 Photo')
+    const { code } = await createLinkCode({ db, adminId: 'a1', now: () => clock })
+    await consumeLinkCode({ db, code, chat: { id: 4242, type: 'private', first_name: 'Ada' }, now: () => clock })
+    assert.deepEqual(await syncChat(), { sent: 0 })
+    assert.equal(files.length, 0)
+  })
+
+  it('leaves photos out when support messages are switched off', async () => {
+    connect({ prefs: { activity: true, support: false, logins: false }, cursor: { activity: at(0), support: null, logins: null } })
+    conversation([message('m1', 20, { attachment: image(PHOTO) })])
+    note('n1', 20.5, '📷 Photo')
+    assert.deepEqual(await syncChat(), { sent: 0 })
+    assert.equal(files.length, 0)
+  })
+})
