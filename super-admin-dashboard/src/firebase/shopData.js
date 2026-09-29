@@ -416,7 +416,15 @@ export async function telegramRequest(db, action, { keepalive = false } = {}) {
       body: JSON.stringify({ action }),
     })
     const body = await response.json().catch(() => null)
-    if (!body) return { success: false, error: 'The Telegram relay is not available here. It runs on the deployed site.' }
+    if (!body) {
+      return {
+        success: false,
+        error:
+          response.status >= 500
+            ? `The Telegram service on the server crashed (error ${response.status}). Check the function logs of the deployment on Vercel.`
+            : 'The Telegram relay is not available here. It runs on the deployed site.',
+      }
+    }
     return body.success ? body : { success: false, error: body.error || 'The Telegram request failed.', notConfigured: !!body.notConfigured }
   } catch (_) {
     return { success: false, error: 'Could not reach the server. Check your connection and try again.' }
