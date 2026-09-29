@@ -8,10 +8,11 @@ export const FILTERS = ['All', 'Unpaid', ...STAGES, 'Cancelled']
 
 export const isClosed = (order) => order.status === 'Delivered' || order.status === 'Cancelled'
 
-// An order the seller has not paid for yet cannot be moved along (the seller pays first); it can only be cancelled.
-export const nextStages = (order) => (order.status === 'Unpaid' || isClosed(order) ? [] : STAGES.slice(STAGES.indexOf(order.status) + 1))
+// An order the seller has not paid for yet cannot be moved along (the seller pays first). Once paid,
+// the admin can set it to any stage, in any order, at any time — not just the next one in sequence.
+export const nextStages = (order) => (order.status === 'Unpaid' || isClosed(order) ? [] : STAGES.filter((stage) => stage !== order.status))
 
-export const canMoveTo = (order, status) => (status === 'Cancelled' ? !isClosed(order) : nextStages(order).includes(status))
+export const canMoveTo = (order, status) => nextStages(order).includes(status)
 
 // TOTAL / PENDING / DELIVERED on a seller card (cancelled orders count towards the total only).
 export function orderCounts(orders = []) {
@@ -63,5 +64,5 @@ export function planBulkMove(orders, status) {
 
 // The moves offered for a selection: only those that at least one selected order can make.
 export function bulkTargets(orders) {
-  return [...STAGES, 'Cancelled'].filter((status) => orders.some((order) => canMoveTo(order, status)))
+  return STAGES.filter((status) => orders.some((order) => canMoveTo(order, status)))
 }

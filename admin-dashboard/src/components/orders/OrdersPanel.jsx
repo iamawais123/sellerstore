@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { decodeEntities } from '../../lib/activityFeed'
 import { FILTERS, STAGES, bulkTargets, filterOrders, nextStages, orderAge, planBulkMove, statusCounts } from '../../lib/orders'
 import { Icon } from './icons'
-import { ConfirmDialog, STATUS_STYLE, StatusPill, money, useOutside } from './ui'
+import { STATUS_STYLE, StatusPill, money, useOutside } from './ui'
 
 const when = (iso) => {
   const date = new Date(iso)
@@ -40,7 +40,7 @@ const Timeline = ({ status }) => {
 const StatusMenu = ({ order, onPick }) => {
   const [open, setOpen] = useState(false)
   const ref = useOutside(open, () => setOpen(false))
-  const options = [...nextStages(order), ...(order.status === 'Delivered' || order.status === 'Cancelled' ? [] : ['Cancelled'])]
+  const options = nextStages(order)
   if (!options.length) return <StatusPill status={order.status} />
   return (
     <div ref={ref} className="relative">
@@ -71,7 +71,7 @@ const StatusMenu = ({ order, onPick }) => {
                   setOpen(false)
                   onPick(status)
                 }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold hover:bg-slate-50 ${status === 'Cancelled' ? 'text-rose-600' : 'text-slate-700'}`}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 <span className={`h-2 w-2 rounded-full ${STATUS_STYLE[status].dot}`} />
                 {status}
@@ -184,34 +184,31 @@ const OrderRow = ({ order, open, onToggle, checked, onCheck, now, onMove, busy }
           {order.status === 'Unpaid' && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">Waiting for the seller to pay {money(order.cost)} to start this order.</p>}
           {order.scheduledFor && <p className="text-xs font-medium text-slate-400">Scheduled for {when(order.scheduledFor)}, created {when(order.createdAt)}.</p>}
 
-          {(options.length > 0 || (order.status !== 'Delivered' && order.status !== 'Cancelled')) && (
+          {options.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              {options[0] && (
-                <button type="button" disabled={busy} onClick={() => onMove([order], options[0])} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
-                  Mark {options[0]}
-                </button>
-              )}
-              {options.slice(1).length > 0 && (
-                <select
-                  value=""
-                  disabled={busy}
-                  onChange={(event) => event.target.value && onMove([order], event.target.value)}
-                  aria-label="Move to another stage"
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
-                >
-                  <option value="">Skip ahead to…</option>
-                  {options.slice(1).map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {order.status !== 'Delivered' && order.status !== 'Cancelled' && (
-                <button type="button" disabled={busy} onClick={() => onMove([order], 'Cancelled')} className="ml-auto rounded-xl border border-rose-200 px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50">
-                  Cancel order
-                </button>
-              )}
+              {options.map((stage) => {
+                const primary = stage === STAGES[STAGES.indexOf(order.status) + 1]
+                return (
+                  <button
+                    key={stage}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onMove([order], stage)}
+                    className={
+                      primary
+                        ? 'rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50'
+                        : 'inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
+                    }
+                  >
+                    {primary ? `Mark ${stage}` : (
+                      <>
+                        <span className={`h-2 w-2 rounded-full ${STATUS_STYLE[stage].dot}`} />
+                        {stage}
+                      </>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
@@ -227,7 +224,6 @@ const OrdersPanel = ({ seller, orders, now, moveOrder, notify, focusOrderId }) =
   const [showCancelled, setShowCancelled] = useState(false)
   const [open, setOpen] = useState(() => new Set(focusOrderId ? [focusOrderId] : []))
   const [picked, setPicked] = useState(() => new Set())
-  const [confirm, setConfirm] = useState(null)
   const [busy, setBusy] = useState(false)
 
   const counts = useMemo(() => statusCounts(orders, showCancelled), [orders, showCancelled])
@@ -264,21 +260,14 @@ const OrdersPanel = ({ seller, orders, now, moveOrder, notify, focusOrderId }) =
       }
     }
     setBusy(false)
-    setConfirm(null)
     setPicked(new Set())
     const moved = plan.move.length - failed
     if (moved) {
       const skipped = plan.skip.length ? ` ${plan.skip.length} skipped (cannot move to ${to}).` : ''
-      notify(to === 'Cancelled' ? `Cancelled ${moved} order${moved === 1 ? '' : 's'}.${skipped}` : `Moved ${moved} order${moved === 1 ? '' : 's'} to ${to}.${skipped}`)
+      notify(`Moved ${moved} order${moved === 1 ? '' : 's'} to ${to}.${skipped}`)
     }
     if (failed) notify(firstError || 'Some orders could not be updated.', 'error')
     else if (!moved) notify(`${targets.length === 1 ? 'This order' : 'These orders'} cannot move to ${to}.`, 'error')
-  }
-
-  const request = (targets, to) => {
-    const eligible = to === 'Cancelled' ? planBulkMove(targets, 'Cancelled').move : []
-    if (eligible.length) setConfirm({ targets: eligible })
-    else run(targets, to)
   }
 
   const allShownPicked = visible.length > 0 && visible.every((order) => picked.has(order.id))
@@ -338,7 +327,7 @@ const OrdersPanel = ({ seller, orders, now, moveOrder, notify, focusOrderId }) =
           <select
             value=""
             disabled={busy}
-            onChange={(event) => event.target.value && request(selection, event.target.value)}
+            onChange={(event) => event.target.value && run(selection, event.target.value)}
             aria-label="Move selected orders"
             className="ml-auto rounded-lg border-0 bg-white/15 px-3 py-1.5 text-sm font-semibold text-white"
           >
@@ -347,7 +336,7 @@ const OrdersPanel = ({ seller, orders, now, moveOrder, notify, focusOrderId }) =
             </option>
             {bulkTargets(selection).map((to) => (
               <option key={to} value={to} className="text-slate-900">
-                {to === 'Cancelled' ? 'Cancel orders' : to}
+                {to}
               </option>
             ))}
           </select>
@@ -379,7 +368,7 @@ const OrdersPanel = ({ seller, orders, now, moveOrder, notify, focusOrderId }) =
                 onCheck={() => toggle(picked, setPicked, order.id)}
                 now={now}
                 busy={busy}
-                onMove={request}
+                onMove={run}
               />
             ))}
           </div>
@@ -389,17 +378,6 @@ const OrdersPanel = ({ seller, orders, now, moveOrder, notify, focusOrderId }) =
           <p className="font-bold text-slate-500">{orders.length === 0 ? 'No orders for this seller yet.' : 'No orders match.'}</p>
           <p className="mt-1 text-sm text-slate-400">{orders.length === 0 ? 'Use Give Order to assign them one.' : 'Try another status or search.'}</p>
         </div>
-      )}
-
-      {confirm && (
-        <ConfirmDialog
-          title={confirm.targets.length === 1 ? 'Cancel this order?' : `Cancel ${confirm.targets.length} orders?`}
-          message="A cancelled order cannot be started again. The seller is told it was cancelled."
-          confirmLabel={confirm.targets.length === 1 ? 'Cancel order' : `Cancel ${confirm.targets.length} orders`}
-          busy={busy}
-          onCancel={() => setConfirm(null)}
-          onConfirm={() => run(confirm.targets, 'Cancelled')}
-        />
       )}
     </div>
   )
