@@ -101,59 +101,62 @@ const OrderRow = ({ order, open, onToggle, checked, onCheck, now, onMove, busy }
         aria-expanded={open}
         onClick={onToggle}
         onKeyDown={(event) => (event.key === 'Enter' || event.key === ' ') && (event.preventDefault(), onToggle())}
-        className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-2 p-3.5 sm:flex-nowrap"
+        className="flex cursor-pointer flex-col gap-2 p-3.5 sm:flex-row sm:flex-nowrap sm:items-center sm:gap-x-3 sm:gap-y-2"
       >
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={checked}
-          aria-label={`Select order for ${customer.fullName || 'customer'}`}
-          onClick={(event) => {
-            event.stopPropagation()
-            onCheck()
-          }}
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${checked ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-400'}`}
-        >
-          {checked && <Icon name="check" className="h-3 w-3" strokeWidth={3.5} />}
-        </button>
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg font-black text-slate-500">{order.items.length}</span>
-        {/* On mobile this sits right after the thumbnail (left side), away from the expand caret on the right; sm: and up it moves back to its natural spot next to the price. */}
-        <div className="order-3 shrink-0 sm:order-none">
+        {/* Checkbox, thumbnail, customer info, expand caret — one row on mobile, and (via sm:contents) folds back into the single desktop row below. */}
+        <div className="flex items-center gap-3 sm:contents">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={checked}
+            aria-label={`Select order for ${customer.fullName || 'customer'}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              onCheck()
+            }}
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${checked ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-400'}`}
+          >
+            {checked && <Icon name="check" className="h-3 w-3" strokeWidth={3.5} />}
+          </button>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg font-black text-slate-500">{order.items.length}</span>
+          <div className="min-w-0 flex-1 basis-40">
+            <p className="flex items-center gap-2">
+              <span className="truncate font-black text-slate-900">{customer.fullName || 'Customer'}</span>
+              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                {order.items.length} item{order.items.length === 1 ? '' : 's'}
+              </span>
+              {order.scheduledFor && (
+                <span title={`Scheduled for ${when(order.scheduledFor)}`} className="shrink-0 text-indigo-500">
+                  <Icon name="calendarClock" className="h-4 w-4" />
+                </span>
+              )}
+            </p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-slate-500">
+              <span>
+                {order.qty} unit{order.qty === 1 ? '' : 's'}
+              </span>
+              <span aria-hidden>•</span>
+              <span>{when(order.createdAt)}</span>
+              <span aria-hidden>•</span>
+              <span className={`inline-flex items-center gap-1 font-semibold ${order.status === 'Unpaid' ? 'text-rose-500' : 'text-slate-400'}`} title="Time since the order was given">
+                <Icon name="clock" className="h-3.5 w-3.5" />
+                {orderAge(order.createdAt, now)}
+              </span>
+            </p>
+          </div>
+          <Icon name="chevronDown" className={`h-5 w-5 shrink-0 text-slate-400 transition-transform sm:hidden ${open ? 'rotate-180' : ''}`} />
+        </div>
+
+        {/* Price + status: a second row on mobile (status left, price right — away from the expand caret above), inline after customer info on desktop. */}
+        <div className="flex flex-row-reverse items-center justify-between gap-3 sm:contents">
+          <div className="shrink-0 text-right">
+            <p className="font-black text-slate-900">{money(order.total)}</p>
+            <p className="text-xs font-semibold text-slate-400">Profit: {money(order.profit)}</p>
+          </div>
           <StatusMenu order={order} onPick={(status) => onMove([order], status)} />
         </div>
-        <div className="order-4 min-w-0 flex-1 basis-40 sm:order-none">
-          <p className="flex items-center gap-2">
-            <span className="truncate font-black text-slate-900">{customer.fullName || 'Customer'}</span>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
-              {order.items.length} item{order.items.length === 1 ? '' : 's'}
-            </span>
-            {order.scheduledFor && (
-              <span title={`Scheduled for ${when(order.scheduledFor)}`} className="shrink-0 text-indigo-500">
-                <Icon name="calendarClock" className="h-4 w-4" />
-              </span>
-            )}
-          </p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-slate-500">
-            <span>
-              {order.qty} unit{order.qty === 1 ? '' : 's'}
-            </span>
-            <span aria-hidden>•</span>
-            <span>{when(order.createdAt)}</span>
-            <span aria-hidden>•</span>
-            <span className={`inline-flex items-center gap-1 font-semibold ${order.status === 'Unpaid' ? 'text-rose-500' : 'text-slate-400'}`} title="Time since the order was given">
-              <Icon name="clock" className="h-3.5 w-3.5" />
-              {orderAge(order.createdAt, now)}
-            </span>
-          </p>
-        </div>
-        <div className="order-5 shrink-0 text-right sm:order-none">
-          <p className="font-black text-slate-900">{money(order.total)}</p>
-          <p className="text-xs font-semibold text-slate-400">Profit: {money(order.profit)}</p>
-        </div>
-        <Icon
-          name="chevronDown"
-          className={`order-6 ml-auto h-5 w-5 shrink-0 text-slate-400 transition-transform sm:order-none sm:ml-0 ${open ? 'rotate-180' : ''}`}
-        />
+
+        <Icon name="chevronDown" className={`hidden h-5 w-5 shrink-0 text-slate-400 transition-transform sm:block ${open ? 'rotate-180' : ''}`} />
       </div>
 
       {open && (
