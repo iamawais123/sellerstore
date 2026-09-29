@@ -15,6 +15,7 @@ const AdminLayout = () => {
     getSupportConversations,
     getAdminNotifications,
     markAdminNotificationsRead,
+    getPendingKYCSellers,
   } = useAuth()
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
@@ -31,6 +32,9 @@ const AdminLayout = () => {
   const supportUnread = getSupportConversations('admin').reduce((sum, item) => sum + (item.unreadForAdmin || 0), 0)
   const notifications = getAdminNotifications()
   const unreadNotifications = notifications.filter((item) => !item.read)
+  // New sellers waiting for their KYC to be reviewed: badge on the KYC link, and an entry in the bell until decided.
+  const pendingKyc = getPendingKYCSellers()
+  const bellCount = unreadNotifications.length + pendingKyc.length
 
   // Picking a page on a phone should reveal it, not leave the drawer covering it.
   useEffect(() => {
@@ -46,6 +50,11 @@ const AdminLayout = () => {
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [bellOpen])
+
+  const openKyc = () => {
+    setBellOpen(false)
+    navigate('/kyc')
+  }
 
   const openNotification = (notification) => {
     if (!notification.read) markAdminNotificationsRead([notification.id])
@@ -82,6 +91,7 @@ const AdminLayout = () => {
     {
       to: '/kyc',
       label: 'KYC',
+      badge: pendingKyc.length,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -434,15 +444,15 @@ const AdminLayout = () => {
               <div>
                 <button
                   onClick={() => setBellOpen((open) => !open)}
-                  aria-label={unreadNotifications.length ? `Notifications, ${unreadNotifications.length} unread` : 'Notifications'}
+                  aria-label={bellCount ? `Notifications, ${bellCount} unread` : 'Notifications'}
                   className="p-2.5 rounded-2xl hover:bg-gray-100 text-gray-600 transition-colors relative"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
-                  {unreadNotifications.length > 0 && (
+                  {bellCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-red-500 border-2 border-white text-[11px] font-bold text-white">
-                      {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
+                      {bellCount > 9 ? '9+' : bellCount}
                     </span>
                   )}
                 </button>
@@ -461,7 +471,23 @@ const AdminLayout = () => {
                       )}
                     </div>
                     <div className="max-h-[420px] overflow-y-auto">
-                      {notifications.length === 0 && <p className="px-4 py-8 text-center text-sm text-gray-500">No notifications yet. Seller messages will show up here.</p>}
+                      {notifications.length === 0 && pendingKyc.length === 0 && (
+                        <p className="px-4 py-8 text-center text-sm text-gray-500">No notifications yet. Seller messages and new KYC requests will show up here.</p>
+                      )}
+                      {pendingKyc.slice(0, 10).map((seller) => (
+                        <button
+                          key={`kyc-${seller.id}`}
+                          onClick={openKyc}
+                          className="block w-full border-b border-gray-50 bg-amber-50/60 px-4 py-3 text-left hover:bg-amber-50"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-bold text-gray-900">New KYC request</p>
+                            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                          </div>
+                          <p className="mt-0.5 truncate text-sm text-gray-600">{seller.shopName || seller.fullName} is waiting for your review</p>
+                          {seller.kyc?.submittedAt && <p className="mt-1 text-xs font-semibold text-gray-400">{seller.kyc.submittedAt}</p>}
+                        </button>
+                      ))}
                       {notifications.slice(0, 20).map((notification) => (
                         <button
                           key={notification.id}

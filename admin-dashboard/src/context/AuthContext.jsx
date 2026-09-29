@@ -402,7 +402,15 @@ export function AuthProvider({ children }) {
 
   const getAllSellersCount = (adminIdFilter = admin.id) => shops.filter((s) => s.adminId === adminIdFilter && !s.deleted).length
 
-  const getPendingKYCCount = (adminIdFilter = admin.id) => shops.filter((s) => s.adminId === adminIdFilter && !s.verified && !s.deleted).length
+  // The KYC requests still waiting for a decision (not the rejected ones), newest first: what the badge on the
+  // KYC link, the bell and the dashboard count. The status is the same one the KYC page shows.
+  const getPendingKYCSellers = (adminIdFilter = admin.id) =>
+    shopData.sortNewest(
+      shops.filter((s) => s.adminId === adminIdFilter && !s.deleted && s.kyc?.status === 'Pending'),
+      'createdAt'
+    )
+
+  const getPendingKYCCount = (adminIdFilter = admin.id) => getPendingKYCSellers(adminIdFilter).length
 
   const getVerifiedSellersForAdmin = (adminIdFilter = admin.id) => getSellersForAdmin(adminIdFilter).filter((s) => s.verified && !s.deleted)
 
@@ -700,6 +708,7 @@ export function AuthProvider({ children }) {
         getSellersForAdmin,
         getAllSellersCount,
         getPendingKYCCount,
+        getPendingKYCSellers,
         sendSellerPasswordReset,
         impersonateSellerLogin,
         sendSellerNotification,
