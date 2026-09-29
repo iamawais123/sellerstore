@@ -22,14 +22,14 @@ const Timeline = ({ status }) => {
   const steps = ['Unpaid', ...STAGES]
   const at = steps.indexOf(status)
   return (
-    <ol className="flex items-center gap-1 overflow-x-auto pb-1" aria-label="Order progress">
+    <ol className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-1 sm:overflow-x-auto sm:pb-1" aria-label="Order progress">
       {steps.map((step, index) => (
-        <li key={step} className="flex shrink-0 items-center gap-1">
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${index < at ? 'bg-emerald-100 text-emerald-700' : index === at ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+        <li key={step} className="flex flex-col items-start gap-1 sm:shrink-0 sm:flex-row sm:items-center">
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${index < at ? 'bg-emerald-100 text-emerald-700' : index === at ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
             {index < at ? '✓ ' : ''}
             {step}
           </span>
-          {index < steps.length - 1 && <span className={`h-px w-3 ${index < at ? 'bg-emerald-300' : 'bg-slate-200'}`} />}
+          {index < steps.length - 1 && <span className={`ml-3 h-3 w-px sm:ml-0 sm:h-px sm:w-3 ${index < at ? 'bg-emerald-300' : 'bg-slate-200'}`} />}
         </li>
       ))}
     </ol>
@@ -59,7 +59,7 @@ const StatusMenu = ({ order, onPick }) => {
         <Icon name="chevronDown" className="h-3.5 w-3.5 text-slate-400" />
       </button>
       {open && (
-        <ul role="menu" className="absolute right-0 top-full z-30 mt-1.5 w-48 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-xl">
+        <ul role="menu" className="absolute left-0 top-full z-30 mt-1.5 w-48 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-xl sm:left-auto sm:right-0">
           <li className="px-3 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Move to</li>
           {options.map((status) => (
             <li key={status}>
@@ -117,7 +117,11 @@ const OrderRow = ({ order, open, onToggle, checked, onCheck, now, onMove, busy }
           {checked && <Icon name="check" className="h-3 w-3" strokeWidth={3.5} />}
         </button>
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg font-black text-slate-500">{order.items.length}</span>
-        <div className="min-w-0 flex-1 basis-40">
+        {/* On mobile this sits right after the thumbnail (left side), away from the expand caret on the right; sm: and up it moves back to its natural spot next to the price. */}
+        <div className="order-3 shrink-0 sm:order-none">
+          <StatusMenu order={order} onPick={(status) => onMove([order], status)} />
+        </div>
+        <div className="order-4 min-w-0 flex-1 basis-40 sm:order-none">
           <p className="flex items-center gap-2">
             <span className="truncate font-black text-slate-900">{customer.fullName || 'Customer'}</span>
             <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
@@ -142,12 +146,14 @@ const OrderRow = ({ order, open, onToggle, checked, onCheck, now, onMove, busy }
             </span>
           </p>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="order-5 shrink-0 text-right sm:order-none">
           <p className="font-black text-slate-900">{money(order.total)}</p>
           <p className="text-xs font-semibold text-slate-400">Profit: {money(order.profit)}</p>
         </div>
-        <StatusMenu order={order} onPick={(status) => onMove([order], status)} />
-        <Icon name="chevronDown" className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <Icon
+          name="chevronDown"
+          className={`order-6 ml-auto h-5 w-5 shrink-0 text-slate-400 transition-transform sm:order-none sm:ml-0 ${open ? 'rotate-180' : ''}`}
+        />
       </div>
 
       {open && (

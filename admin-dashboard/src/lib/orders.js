@@ -8,9 +8,10 @@ export const FILTERS = ['All', 'Unpaid', ...STAGES, 'Cancelled']
 
 export const isClosed = (order) => order.status === 'Delivered' || order.status === 'Cancelled'
 
-// An order the seller has not paid for yet cannot be moved along (the seller pays first). Once paid,
-// the admin can set it to any stage, in any order, at any time — not just the next one in sequence.
-export const nextStages = (order) => (order.status === 'Unpaid' || isClosed(order) ? [] : STAGES.filter((stage) => stage !== order.status))
+// An order the seller has not paid for yet cannot be moved along (the seller pays first). A cancelled
+// order stays cancelled. Otherwise — Delivered included — the admin can set it to any other stage, in
+// any order, at any time, e.g. to correct a mistake after the fact.
+export const nextStages = (order) => (order.status === 'Unpaid' || order.status === 'Cancelled' ? [] : STAGES.filter((stage) => stage !== order.status))
 
 export const canMoveTo = (order, status) => nextStages(order).includes(status)
 
