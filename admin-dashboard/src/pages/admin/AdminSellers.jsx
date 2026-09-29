@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { isOnline } from '../../lib/supportChat'
@@ -1778,7 +1778,10 @@ const AdminSellers = () => {
   const [search, setSearch] = useState(params.get('q') || '')
   const [showDeleted, setShowDeleted] = useState(false)
   const [openMenuFor, setOpenMenuFor] = useState(null)
-  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
+  // Where the desktop dropdown sits: below its button when it fits, above it when it does not, and never taller than the screen.
+  const [menuPos, setMenuPos] = useState({ top: 0, bottom: null, right: 0, maxHeight: null })
+  const menuAnchor = useRef(null)
+  const dropdownRef = useRef(null)
   const [passwordModal, setPasswordModal] = useState(null)
   const [notifModal, setNotifModal] = useState(null)
   const [activityModal, setActivityModal] = useState(null)
@@ -1817,6 +1820,37 @@ const AdminSellers = () => {
     return () => {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
+    }
+  }, [openMenuFor])
+
+  // Once the dropdown is on screen, measure it and put it where all of it can be seen. Runs before the browser
+  // paints, so it never shows in the wrong place first.
+  useLayoutEffect(() => {
+    const menu = dropdownRef.current
+    const anchor = menuAnchor.current
+    if (!openMenuFor || !menu || !anchor) return
+    const gap = 8
+    const margin = 12
+    const below = window.innerHeight - anchor.bottom - gap - margin
+    const above = anchor.top - gap - margin
+    const height = menu.scrollHeight
+    if (height <= below) setMenuPos({ top: anchor.bottom + gap, bottom: null, right: anchor.right, maxHeight: below })
+    else if (height <= above || above > below) setMenuPos({ top: null, bottom: window.innerHeight - anchor.top + gap, right: anchor.right, maxHeight: above })
+    else setMenuPos({ top: anchor.bottom + gap, bottom: null, right: anchor.right, maxHeight: below })
+  }, [openMenuFor])
+
+  // The dropdown is fixed to the screen, so it would drift away from its row: close it when the page moves.
+  useEffect(() => {
+    if (!openMenuFor || window.innerWidth < 640) return undefined
+    const close = (e) => {
+      if (e.type === 'scroll' && dropdownRef.current?.contains(e.target)) return
+      setOpenMenuFor(null)
+    }
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
     }
   }, [openMenuFor])
 
@@ -2027,7 +2061,8 @@ const AdminSellers = () => {
                         onClick={(e) => {
                           if (!menuOpen) {
                             const r = e.currentTarget.getBoundingClientRect()
-                            setMenuPos({ top: r.bottom + 8, right: window.innerWidth - r.right })
+                            menuAnchor.current = { top: r.top, bottom: r.bottom, right: window.innerWidth - r.right }
+                            setMenuPos({ top: r.bottom + 8, bottom: null, right: window.innerWidth - r.right, maxHeight: null })
                           }
                           setOpenMenuFor(menuOpen ? null : s.id)
                         }}
@@ -2083,8 +2118,13 @@ const AdminSellers = () => {
                             </div>
 
                             {/* Desktop: fixed dropdown */}
-                            <div role="menu" style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999 }} className="hidden sm:block w-[280px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
-                              <ul className="max-h-[70vh] overflow-y-auto py-1.5">
+                            <div
+                              ref={dropdownRef}
+                              role="menu"
+                              style={{ position: 'fixed', top: menuPos.top ?? 'auto', bottom: menuPos.bottom ?? 'auto', right: menuPos.right, maxHeight: menuPos.maxHeight ?? undefined, zIndex: 9999 }}
+                              className="hidden sm:flex sm:flex-col w-[280px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl"
+                            >
+                              <ul className="min-h-0 overflow-y-auto py-1.5">
                                 {renderEntries(entries)}
                               </ul>
                             </div>
