@@ -184,8 +184,7 @@ const ProductsStep = ({ products, selectedItems, onToggle }) => {
               <div className="space-y-0.5 p-2.5">
                 <p className="line-clamp-2 min-h-[2rem] text-xs font-bold leading-4 text-slate-900">{decodeEntities(product.name)}</p>
                 <p className="truncate text-[11px] font-semibold text-indigo-600">{decodeEntities(product.category)}</p>
-                <p className="text-xs font-black text-slate-900">Unit: {money(product.sell)}</p>
-                <p className="text-[11px] font-semibold text-slate-400">Cost: {money(product.cost)}</p>
+                <p className="text-xs font-black text-slate-900">Price: {money(product.sell)}</p>
               </div>
             </button>
           )

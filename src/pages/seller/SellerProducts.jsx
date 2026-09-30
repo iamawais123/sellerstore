@@ -287,7 +287,7 @@ const SellerProducts = () => {
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-bold text-gray-900">{product.name}</p>
                   <p className="mt-1 text-sm text-gray-500">
-                    Cost {money(product.cost)}  Sell {money(product.sell)}  <span className="font-black text-emerald-600">↗ +{money(product.sell - product.cost)}</span>
+                    Price <span className="font-black text-gray-900">{money(product.sell)}</span>
                   </p>
                 </div>
                 {seller.allowProductRemoval !== false && (

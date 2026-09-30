@@ -176,7 +176,7 @@ const OrderRow = ({ order, open, onToggle, checked, onCheck, now, onMove, busy }
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-slate-800">{decodeEntities(item.name)}</p>
                   <p className="text-xs text-slate-500">
-                    {item.qty} × {money(item.sell)} · cost {money(item.cost)}
+                    {item.qty} × {money(item.sell)}
                   </p>
                 </div>
                 <span className="shrink-0 text-sm font-black text-slate-900">{money(item.sell * item.qty)}</span>
