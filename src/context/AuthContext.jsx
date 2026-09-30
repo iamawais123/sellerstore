@@ -49,7 +49,7 @@ const defaultSeller = {
   suspended: false,
   withdrawalsBlocked: false,
   allowProductRemoval: false,
-  productLimit: 50,
+  productLimit: shopData.DEFAULT_PRODUCT_LIMIT,
   viewsBoost: 0,
   kycAckSeen: false,
   productIds: [],
@@ -594,7 +594,7 @@ export function AuthProvider({ children }) {
     (seller.productIds || EMPTY).map((id) => catalogById.get(id)).filter(Boolean)
 
   const getSellerSlotInfo = () => {
-    const limit = seller.productLimit ?? 50
+    const limit = seller.productLimit ?? shopData.DEFAULT_PRODUCT_LIMIT
     const used = (seller.productIds || EMPTY).length
     return { used, limit, remaining: Math.max(0, limit - used), full: used >= limit }
   }
@@ -631,12 +631,14 @@ export function AuthProvider({ children }) {
     return picks
   }
 
-  const quickAddRandomToShop = async (_sellerId, count = 50) => {
+  // Fills `count` slots with random products — every free slot when `count` is left out, so a shop with 1000
+  // slots quick-adds 1000, not a fixed handful.
+  const quickAddRandomToShop = async (_sellerId, count = Infinity) => {
     const problem = needSeller()
     if (problem) return problem
     if (!seller.verified) return { success: false, error: 'Your store is not verified yet' }
     const existing = new Set(seller.productIds || EMPTY)
-    const remaining = Math.max(0, (seller.productLimit ?? 50) - existing.size)
+    const remaining = Math.max(0, (seller.productLimit ?? shopData.DEFAULT_PRODUCT_LIMIT) - existing.size)
     if (!remaining) return { success: false, error: 'No slots remaining' }
     const pool = masterCatalog.filter((item) => !existing.has(item.id))
     const picks = pickRandom(pool, Math.min(count, remaining)).map((item) => item.id)

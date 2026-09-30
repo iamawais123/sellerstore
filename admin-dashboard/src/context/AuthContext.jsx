@@ -619,7 +619,7 @@ export function AuthProvider({ children }) {
       .filter(Boolean)
 
   const getSellerSlotInfo = (sellerId) => {
-    const limit = shopById(sellerId)?.productLimit ?? 50
+    const limit = shopById(sellerId)?.productLimit ?? shopData.DEFAULT_PRODUCT_LIMIT
     const used = getSellerShopProductIds(sellerId).length
     return { used, limit, remaining: Math.max(0, limit - used) }
   }

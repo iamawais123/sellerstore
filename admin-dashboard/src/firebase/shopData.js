@@ -114,6 +114,9 @@ export const clockTime = (iso) => {
 
 // ---- shops ----------------------------------------------------------------------------------
 
+// How many products a new shop may hold until its admin sets another limit (Sellers → Product Limit).
+export const DEFAULT_PRODUCT_LIMIT = 500
+
 const shopDefaults = () => ({
   balance: 0,
   guarantee: 0,
@@ -125,7 +128,7 @@ const shopDefaults = () => ({
   withdrawalsBlocked: false,
   // No `allowProductRemoval` here on purpose: a seller cannot remove products until their admin allows it
   // (Sellers → ⋮ → Allow Product Removal writes `true`); a shop without the field is denied.
-  productLimit: 50,
+  productLimit: DEFAULT_PRODUCT_LIMIT,
   viewsBoost: 0,
   kycAckSeen: false,
   productIds: [],
@@ -824,6 +827,8 @@ const productLine = (id, details) =>
     price: Number.isFinite(Number(details?.[id]?.price)) ? round2(details[id].price) : undefined,
   })
 
+const MAX_FEED_PRODUCTS = 1000
+
 export const addProductsToShop = (db, sellerId, catalogIds, actorId = sellerId, details = {}) =>
   attempt(() =>
     runTransaction(db, async (tx) => {
@@ -832,13 +837,14 @@ export const addProductsToShop = (db, sellerId, catalogIds, actorId = sellerId, 
       if (!shopSnap.exists()) refuse('Seller not found')
       const shop = shopSnap.data()
       if (!shop.verified) refuse('Your store is not verified yet')
-      const limit = shop.productLimit ?? 50
+      const limit = shop.productLimit ?? DEFAULT_PRODUCT_LIMIT
       const existing = Array.isArray(shop.productIds) ? shop.productIds : []
       const have = new Set(existing)
       const toAdd = []
       for (const id of catalogIds) {
-        if (have.has(id) || toAdd.includes(id)) continue
+        if (have.has(id)) continue
         if (existing.length + toAdd.length >= limit) break
+        have.add(id)
         toAdd.push(id)
       }
       if (!toAdd.length) refuse('No slots remaining')
@@ -851,8 +857,9 @@ export const addProductsToShop = (db, sellerId, catalogIds, actorId = sellerId, 
         title: `${toAdd.length} product${toAdd.length === 1 ? '' : 's'} added to shop`,
         entity: shop.fullName,
         icon: 'package',
-        // One line however many products: the feed lists each product from `meta.items`.
-        meta: { items: toAdd.map((id) => productLine(id, details)) },
+        // One line however many products: the feed lists each product from `meta.items`. Capped so a huge add
+        // (a limit of thousands) still fits in one activity document (Firestore allows 1 MiB per document).
+        meta: { items: toAdd.slice(0, MAX_FEED_PRODUCTS).map((id) => productLine(id, details)) },
       })
       return { success: true, added: toAdd.length }
     })

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { DEFAULT_PRODUCT_LIMIT } from '../../firebase/shopData'
 import { isOnline } from '../../lib/supportChat'
 
 const avatarColors = [
@@ -986,7 +987,7 @@ const RatingModal = ({ seller, onClose }) => {
 
 const ProductLimitModal = ({ seller, onClose }) => {
   const { adjustSellerProductLimit } = useAuth()
-  const [limit, setLimit] = useState(String(seller.productLimit ?? 500))
+  const [limit, setLimit] = useState(String(seller.productLimit ?? DEFAULT_PRODUCT_LIMIT))
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -1019,7 +1020,7 @@ const ProductLimitModal = ({ seller, onClose }) => {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">{seller.shopName || seller.fullName}</p>
               <h3 className="text-3xl font-black text-gray-900 mt-1">Adjust Product Limit</h3>
-              <p className="text-gray-500 mt-1 font-medium">Current: <span className="font-black text-gray-800">{seller.productLimit ?? 500} products</span></p>
+              <p className="text-gray-500 mt-1 font-medium">Current: <span className="font-black text-gray-800">{seller.productLimit ?? DEFAULT_PRODUCT_LIMIT} products</span></p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">

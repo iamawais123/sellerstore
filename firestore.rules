@@ -325,7 +325,9 @@ service cloud.firestore {
         && request.resource.data.get('withdrawalsBlocked', false) == false
         // Removing products starts off: only an admin can switch it on later (a missing field means off).
         && request.resource.data.get('allowProductRemoval', false) == false
-        && request.resource.data.get('productLimit', 50) == 50
+        // New shops start at 500 slots. 50 (the old default) stays valid so a sign-up page opened before
+        // this change still works; anything else can only be set by an admin afterwards.
+        && request.resource.data.get('productLimit', 500) in [50, 500]
         && request.resource.data.get('viewsBoost', 0) == 0
         && request.resource.data.get('kycAckSeen', false) == false
         && request.resource.data.get('productIds', []).size() == 0
@@ -358,7 +360,7 @@ service cloud.firestore {
           || (diffKeys().hasOnly(['productIds'])
               && resource.data.verified == true
               && shopOpen(resource.data)
-              && request.resource.data.productIds.size() <= resource.data.productLimit
+              && request.resource.data.productIds.size() <= resource.data.get('productLimit', 500)
               && (resource.data.get('allowProductRemoval', false) == true
                   || request.resource.data.productIds.hasAll(resource.data.get('productIds', []))))))
         // The admin who owns the seller (or a super admin): everything an admin console edits.

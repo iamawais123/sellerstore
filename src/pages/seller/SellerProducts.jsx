@@ -18,6 +18,7 @@ const CatalogModal = ({ seller, onClose }) => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [confirmClear, setConfirmClear] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [quickAdding, setQuickAdding] = useState(false)
 
   const catalog = getMasterCatalog()
   const existingIds = getSellerShopProductIds(seller.id)
@@ -63,9 +64,18 @@ const CatalogModal = ({ seller, onClose }) => {
     }
   }
 
-  const quickAddCount = Math.min(50, slots.remaining)
+  // Quick add fills every free slot — 500 by default, 1000 when the admin raised the limit to 1000 — for as
+  // long as the catalogue still has products this shop doesn't carry.
+  const notInShop = useMemo(() => {
+    const inShop = new Set(existingIds)
+    return catalog.reduce((count, product) => count + (inShop.has(product.id) ? 0 : 1), 0)
+  }, [catalog, existingIds])
+  const quickAddCount = Math.min(slots.remaining, notInShop)
   const handleQuickAdd = async () => {
+    if (quickAdding) return
+    setQuickAdding(true)
     const result = await quickAddRandomToShop(seller.id, quickAddCount)
+    setQuickAdding(false)
     if (result.success) {
       setToast(`Quick-added ${result.added} random product${result.added === 1 ? '' : 's'} to your shop.`)
       setTimeout(onClose, 700)
@@ -133,7 +143,11 @@ const CatalogModal = ({ seller, onClose }) => {
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm font-bold text-gray-500">Remaining slots: <span className="text-gray-900">{slots.remaining} / {slots.limit}</span></p>
-                <button onClick={handleQuickAdd} className="rounded-xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700 hover:bg-indigo-100">✨ Quick add {quickAddCount} random</button>
+                {quickAddCount > 0 && (
+                  <button onClick={handleQuickAdd} disabled={quickAdding} className="rounded-xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700 hover:bg-indigo-100 disabled:opacity-60">
+                    {quickAdding ? 'Adding…' : `✨ Quick add ${quickAddCount} random`}
+                  </button>
+                )}
               </div>
               <label className="flex items-center gap-2 text-sm font-bold text-gray-600">
                 <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />

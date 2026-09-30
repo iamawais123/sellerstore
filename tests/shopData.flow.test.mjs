@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 import { after, before, beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing'
-import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import * as shop from '../src/firebase/shopData.js'
 
 const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080').split(':')
@@ -83,9 +83,17 @@ describe('the shop lifecycle', () => {
     await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, balance: 500 }))
     await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, verified: true }))
     await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, productLimit: 5000 }))
+    await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, productLimit: 1000 }))
+    await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, productLimit: 0 }))
     await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, adminId: 'a2' }))
     await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, kyc: { ...good.kyc, status: 'Approved' } }))
     await assertSucceeds(setDoc(doc(db('s1'), 'shops/s1'), good))
+  })
+
+  it('still accepts a sign-up that starts at the old 50 slots (a page opened before the new default)', async () => {
+    const good = shop.newShopRecord(sellerProfile('s1', 'a1'))
+    await assertSucceeds(setDoc(doc(db('s1'), 'shops/s1'), { ...good, productLimit: 50 }))
+    assert.equal((await read(db('a1'), 'shops/s1')).productLimit, 50)
   })
 
   it('lets a seller report where they are (for the admin\'s support chat), and nothing else with it', async () => {
@@ -687,8 +695,67 @@ describe('catalogue', () => {
     assert.equal((await shop.addProductsToShop(db('s1'), 's1', ['p1'])).success, false)
     await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { productIds: ['p1'] }))
     const target = await verifiedShop({ balance: 0 })
-    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { productIds: Array.from({ length: 51 }, (_, i) => `p${i}`) }))
+    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { productIds: Array.from({ length: 501 }, (_, i) => `p${i}`) }))
+    await assertSucceeds(updateDoc(doc(db('s1'), 'shops/s1'), { productIds: Array.from({ length: 500 }, (_, i) => `p${i}`) }))
     assert.equal(target.id, 's1')
+  })
+
+  const catalogue = (prefix, count) => Array.from({ length: count }, (_, i) => `${prefix}${i}`)
+
+  it('gives every new shop 500 product slots, and a seller can fill all of them in one add', async () => {
+    assert.equal(shop.DEFAULT_PRODUCT_LIMIT, 500)
+    assert.equal(shop.newShopRecord(sellerProfile('s1', 'a1')).productLimit, 500)
+    await verifiedShop({ balance: 0 })
+    assert.equal((await read(db('s1'), 'shops/s1')).productLimit, 500)
+
+    // "Quick add" asks for every free slot: all 500 go in together, and not one more fits
+    const filled = await shop.addProductsToShop(db('s1'), 's1', catalogue('p', 500))
+    assert.equal(filled.added, 500)
+    assert.equal((await read(db('s1'), 'shops/s1')).productIds.length, 500)
+    const full = await shop.addProductsToShop(db('s1'), 's1', ['extra'])
+    assert.equal(full.success, false)
+    assert.match(full.error, /no slots remaining/i)
+  })
+
+  it('follows the limit the admin sets: 1,000 slots take a 1,000-product quick add', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    assert.equal((await shop.setProductLimit(db('a1'), target, 1000, 'a1')).success, true)
+    // what the admin's feed is given for each product is at its longest here (140-char names, 300-char images)
+    const details = Object.fromEntries(catalogue('p', 1000).map((id) => [id, { name: 'N'.repeat(140), image: `https://img.example/${'i'.repeat(270)}.jpg`, price: 1234.56 }]))
+    const filled = await shop.addProductsToShop(db('s1'), 's1', catalogue('p', 1000), 's1', details)
+    assert.equal(filled.success, true)
+    assert.equal(filled.added, 1000)
+    assert.equal((await read(db('s1'), 'shops/s1')).productIds.length, 1000)
+    const [entry] = (await getDocs(query(collection(db('a1'), 'activityLogs'), where('adminId', '==', 'a1')))).docs.map((d) => d.data()).filter((row) => row.type === 'seller_products_added')
+    assert.equal(entry.title, '1000 products added to shop')
+    assert.equal(entry.meta.items.length, 1000)
+    assert.equal((await shop.addProductsToShop(db('s1'), 's1', ['extra'])).success, false)
+  })
+
+  it('keeps one add inside a single activity entry however high the limit is', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    await shop.setProductLimit(db('a1'), target, 1500, 'a1')
+    const filled = await shop.addProductsToShop(db('s1'), 's1', catalogue('p', 1500))
+    assert.equal(filled.added, 1500)
+    assert.equal((await read(db('s1'), 'shops/s1')).productIds.length, 1500)
+    const [entry] = (await getDocs(query(collection(db('a1'), 'activityLogs'), where('adminId', '==', 'a1')))).docs.map((d) => d.data()).filter((row) => row.type === 'seller_products_added')
+    assert.equal(entry.title, '1500 products added to shop')
+    assert.equal(entry.meta.items.length, 1000, 'the feed lists the first 1,000 by name; the title keeps the real count')
+  })
+
+  it('counts a product once when an add names it twice', async () => {
+    await verifiedShop({ balance: 0 })
+    const added = await shop.addProductsToShop(db('s1'), 's1', ['p1', 'p2', 'p1', 'p2', 'p3'])
+    assert.equal(added.added, 3)
+    assert.deepEqual((await read(db('s1'), 'shops/s1')).productIds, ['p1', 'p2', 'p3'])
+  })
+
+  it('lets a shop that has no stored limit add products (500 is assumed)', async () => {
+    await verifiedShop({ balance: 0 })
+    await env.withSecurityRulesDisabled(async (ctx) => updateDoc(doc(ctx.firestore(), 'shops/s1'), { productLimit: deleteField() }))
+    assert.equal((await read(db('s1'), 'shops/s1')).productLimit, undefined)
+    assert.equal((await shop.addProductsToShop(db('s1'), 's1', catalogue('p', 500))).added, 500)
+    assert.equal((await shop.addProductsToShop(db('s1'), 's1', ['extra'])).success, false)
   })
 })
 
