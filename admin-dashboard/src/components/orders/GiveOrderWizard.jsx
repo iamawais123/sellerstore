@@ -1,36 +1,11 @@
 import { useMemo, useState } from 'react'
+import { randomUSACustomer } from '../../data/randomAddresses'
 import { decodeEntities } from '../../lib/activityFeed'
 import { DEFAULT_PROFIT_RANGE, computeOrderTotals, hasProfitRatio, rollProfitRatio } from '../../firebase/shopData'
 import { fromLocalInput, quickTimes, whenLabel } from '../../lib/schedules'
 import { isOnline } from '../../lib/supportChat'
 import { Icon } from './icons'
 import { ShopAvatar, money, useCopy } from './ui'
-
-const RANDOM_NAMES = ['Parker Brown', 'Jamie Jackson', 'Taylor Reed', 'Morgan Lee', 'Casey Diaz', 'Jordan Blake', 'Riley Chen', 'Avery Scott']
-const RANDOM_PLACES = [
-  ['Boston', 'MA', '02101'],
-  ['Austin', 'TX', '73301'],
-  ['Seattle', 'WA', '98101'],
-  ['Denver', 'CO', '80201'],
-  ['Miami', 'FL', '33101'],
-  ['Chicago', 'IL', '60601'],
-]
-const RANDOM_STREETS = ['Elm St', 'Oak Ave', 'Maple Dr', 'Cedar Ln', 'Pine St', '2nd Ave']
-const pick = (list) => list[Math.floor(Math.random() * list.length)]
-
-const randomUSACustomer = () => {
-  const [city, state, postalCode] = pick(RANDOM_PLACES)
-  return {
-    fullName: pick(RANDOM_NAMES),
-    phone: `+1 ${Math.floor(200 + Math.random() * 700)}-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`,
-    address1: `${Math.floor(100 + Math.random() * 9000)} ${pick(RANDOM_STREETS)}`,
-    address2: '',
-    city,
-    state,
-    postalCode,
-    country: 'United States',
-  }
-}
 
 const emptyCustomer = { fullName: '', phone: '', address1: '', address2: '', city: '', state: '', postalCode: '', country: 'United States' }
 
@@ -265,7 +240,7 @@ const CustomerStep = ({ customer, setCustomer, timing, setTiming, scheduledLocal
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">Enter the customer's details, or fill in a random US customer to try it out.</p>
+        <p className="text-sm text-slate-500">Enter the customer's details, or fill in a random US customer — a different one from a list of 1,000 addresses each time.</p>
         <button type="button" onClick={() => setCustomer(randomUSACustomer())} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-100 px-3.5 py-2 text-sm font-bold text-amber-700 hover:bg-amber-200">
           <Icon name="sparkles" className="h-4 w-4" />
           Random USA
