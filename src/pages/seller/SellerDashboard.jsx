@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { initialsOf } from '../../data/avatar'
 
 const KycApprovedModal = ({ onContinue }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4">
@@ -24,8 +25,9 @@ const KycApprovedModal = ({ onContinue }) => (
   </div>
 )
 
-// The header of the dashboard: whose store this is, and the three numbers a seller opens it for.
-const StoreBanner = ({ shopName, verified, balance, revenue, profit }) => {
+// The header of the dashboard: whose store this is (the profile photo stands for the store), and the
+// three numbers a seller opens it for.
+const StoreBanner = ({ shopName, avatar, verified, balance, revenue, profit }) => {
   const figures = [
     { label: 'Shop balance', value: balance },
     { label: 'Total revenue', value: revenue },
@@ -36,9 +38,14 @@ const StoreBanner = ({ shopName, verified, balance, revenue, profit }) => {
       <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/5" />
       <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-24 h-48 w-48 rounded-full bg-white/5" />
       <div className="relative flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">Your store</p>
-          <h1 className="mt-1 truncate text-2xl font-black leading-tight sm:text-3xl">{shopName || 'My Shop'}</h1>
+        <div className="flex min-w-0 items-center gap-3.5 sm:gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-white/30 bg-white/20 text-xl font-bold text-white sm:h-[72px] sm:w-[72px] sm:text-2xl">
+            {avatar ? <img src={avatar} alt="Store" className="h-full w-full object-cover" /> : initialsOf(shopName)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">Your store</p>
+            <h1 className="mt-1 truncate text-2xl font-black leading-tight sm:text-3xl">{shopName || 'My Shop'}</h1>
+          </div>
         </div>
         <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${verified ? 'bg-emerald-400/20 text-emerald-100' : 'bg-amber-400/20 text-amber-100'}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${verified ? 'bg-emerald-300' : 'bg-amber-300'}`} />
@@ -231,7 +238,7 @@ const SellerDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <StoreBanner shopName={seller.shopName} verified={seller.verified} balance={activity.shopBalance} revenue={activity.revenue} profit={activity.profit} />
+      <StoreBanner shopName={seller.shopName} avatar={seller.avatar} verified={seller.verified} balance={activity.shopBalance} revenue={activity.revenue} profit={activity.profit} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
         {bigStatCards.map((card, i) => (

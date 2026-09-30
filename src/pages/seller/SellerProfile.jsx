@@ -2,7 +2,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { loadSellerProfile } from '../../firebase/accounts'
-import { prepareAvatar } from '../../data/avatar'
+import { initialsOf, prepareAvatar } from '../../data/avatar'
 import { Icon } from '../../components/profile/Sheet'
 import ShopSettingsSheet from '../../components/profile/ShopSettingsSheet'
 import AccountSheet from '../../components/profile/AccountSheet'
@@ -16,15 +16,6 @@ const VERIFICATION_BADGES = {
   rejected: { label: 'Rejected', icon: 'shieldAlert', className: 'bg-rose-500/20 text-rose-200 border-rose-400/30' },
   none: { label: 'Not verified', icon: 'shieldAlert', className: 'bg-amber-500/20 text-amber-200 border-amber-400/30' },
 }
-
-const initialsOf = (name) =>
-  (name || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0].toUpperCase())
-    .join('') || 'S'
 
 const SellerProfile = () => {
   const { seller } = useOutletContext()

@@ -5,6 +5,16 @@ import { loadImage, readAsDataUrl } from './kycDocument'
 const SIZE = 256
 export const MAX_AVATAR_CHARS = 60000
 
+// What stands in for the photo until one is chosen: up to two initials of the name.
+export const initialsOf = (name) =>
+  (name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0].toUpperCase())
+    .join('') || 'S'
+
 // Resolves to a data URL that fits on the shop, or throws an Error whose message is fit to show.
 export async function prepareAvatar(file) {
   if (!file) return null
