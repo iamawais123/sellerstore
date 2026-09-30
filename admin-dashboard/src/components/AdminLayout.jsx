@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { conversationId } from '../firebase/shopData'
+import { conversationId, timeAgo } from '../firebase/shopData'
 
 const AdminLayout = () => {
   const navigate = useNavigate()
@@ -16,6 +16,7 @@ const AdminLayout = () => {
     getAdminNotifications,
     markAdminNotificationsRead,
     getPendingKYCSellers,
+    getPendingWithdrawals,
   } = useAuth()
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
@@ -34,9 +35,11 @@ const AdminLayout = () => {
   const unreadNotifications = notifications.filter((item) => !item.read)
   // New sellers waiting for their KYC to be reviewed: badge on the KYC link, and an entry in the bell until decided.
   const pendingKyc = getPendingKYCSellers()
-  const bellCount = unreadNotifications.length + pendingKyc.length
+  // Withdrawal requests waiting for a decision: same treatment — badge on the Withdrawals link, an entry in the bell until decided.
+  const pendingWithdrawals = getPendingWithdrawals()
+  const bellCount = unreadNotifications.length + pendingKyc.length + pendingWithdrawals.length
   // Everything waiting for the admin: shown on the menu button (the sidebar is hidden on a phone) and in the tab title.
-  const attention = pendingKyc.length + supportUnread
+  const attention = pendingKyc.length + pendingWithdrawals.length + supportUnread
 
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\)\s*/, '')
@@ -64,6 +67,11 @@ const AdminLayout = () => {
   const openKyc = () => {
     setBellOpen(false)
     navigate('/kyc')
+  }
+
+  const openWithdrawals = () => {
+    setBellOpen(false)
+    navigate('/withdrawals')
   }
 
   const openNotification = (notification) => {
@@ -136,6 +144,7 @@ const AdminLayout = () => {
     {
       to: '/withdrawals',
       label: 'Withdrawals',
+      badge: pendingWithdrawals.length,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
@@ -483,9 +492,25 @@ const AdminLayout = () => {
                       )}
                     </div>
                     <div className="max-h-[420px] overflow-y-auto">
-                      {notifications.length === 0 && pendingKyc.length === 0 && (
-                        <p className="px-4 py-8 text-center text-sm text-gray-500">No notifications yet. Seller messages and new KYC requests will show up here.</p>
+                      {notifications.length === 0 && pendingKyc.length === 0 && pendingWithdrawals.length === 0 && (
+                        <p className="px-4 py-8 text-center text-sm text-gray-500">No notifications yet. Seller messages, new KYC requests and withdrawal requests will show up here.</p>
                       )}
+                      {pendingWithdrawals.slice(0, 10).map((withdrawal) => (
+                        <button
+                          key={`withdrawal-${withdrawal.id}`}
+                          onClick={openWithdrawals}
+                          className="block w-full border-b border-gray-50 bg-rose-50/60 px-4 py-3 text-left hover:bg-rose-50"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-bold text-gray-900">New withdrawal request</p>
+                            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                          </div>
+                          <p className="mt-0.5 truncate text-sm text-gray-600">
+                            {withdrawal.shopName || withdrawal.sellerName} requested ${Number(withdrawal.amount || 0).toFixed(2)}
+                          </p>
+                          {withdrawal.createdAt && <p className="mt-1 text-xs font-semibold text-gray-400">{timeAgo(withdrawal.createdAt)}</p>}
+                        </button>
+                      ))}
                       {pendingKyc.slice(0, 10).map((seller) => (
                         <button
                           key={`kyc-${seller.id}`}

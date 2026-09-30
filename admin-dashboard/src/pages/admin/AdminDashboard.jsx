@@ -309,7 +309,12 @@ const AdminDashboard = () => {
               </svg>
             </div>
             <div>
-              <p className="text-lg sm:text-3xl font-black text-gray-900 leading-none">{pendingWithdrawals}</p>
+              <p className="flex items-center gap-2 text-lg sm:text-3xl font-black text-gray-900 leading-none">
+                {pendingWithdrawals}
+                {pendingWithdrawals > 0 && (
+                  <span className="min-w-[1.5rem] rounded-full bg-red-500 px-2 py-0.5 text-center text-xs font-bold text-white">{pendingWithdrawals > 99 ? '99+' : pendingWithdrawals}</span>
+                )}
+              </p>
               <p className="text-[11px] sm:text-[14.5px] text-gray-600 font-semibold mt-0.5 sm:mt-1">Pending Withdrawals</p>
             </div>
           </div>

@@ -587,6 +587,13 @@ export function AuthProvider({ children }) {
     )
   }
 
+  // The withdrawal requests still waiting for a decision, newest first: what the badge on the Withdrawals link,
+  // the bell and the dashboard count. "Pending" is the same status the Withdrawals page shows.
+  const getPendingWithdrawals = (adminIdFilter = admin.id) =>
+    getAllWithdrawalsForAdmin(adminIdFilter)
+      .filter((w) => w.status === 'Pending')
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+
   // `details` is `{ reference, message }`: the transaction id the payout was made with, and the note the seller is sent.
   const processWithdrawal = (sellerId, withdrawalId, approve, details) =>
     withShop(sellerId, (db, target, actorId) => shopData.processWithdrawal(db, target, withdrawalId, approve, actorId, details))
@@ -745,6 +752,7 @@ export function AuthProvider({ children }) {
         getSellerWithdrawals,
         getSellerCampaigns,
         getAllWithdrawalsForAdmin,
+        getPendingWithdrawals,
         processWithdrawal,
         initiateWithdrawal,
         getSellerPayoutMethods,
