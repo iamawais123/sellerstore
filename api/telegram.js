@@ -2,7 +2,7 @@
 // `Authorization: Bearer <Firebase ID token>`). Runs on Vercel, so it costs nothing and needs no
 // Blaze plan; the bot token and the service-account key stay in its environment variables.
 //
-//   sync        a seller just did something: send their admin's Telegram whatever is new
+//   sync        a seller just wrote in support chat: send their admin's Telegram whatever is new
 //   link        an admin asks for the link that connects their Telegram
 //   test        an admin sends themselves a test message
 //   disconnect  an admin unlinks their Telegram

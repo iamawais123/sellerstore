@@ -39,7 +39,7 @@ export async function runAction(action, caller, { db, send, botUsername, dashboa
 
   if (action === 'disconnect') {
     const link = await disconnectAdmin({ db, adminId })
-    if (link?.chatId) await send(link.chatId, '🔕 Disconnected. You will not get admin dashboard notifications here any more.').catch(() => {})
+    if (link?.chatId) await send(link.chatId, '🔕 Disconnected. You will not get support message alerts here any more.').catch(() => {})
     return {}
   }
 

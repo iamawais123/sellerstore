@@ -79,7 +79,7 @@ const refuse = (message) => {
 async function attempt(task) {
   try {
     const result = await task()
-    // Whatever just committed may be news for the admin's Telegram (see markTelegramNews).
+    // A support message that just committed is news for the admin's Telegram (see markTelegramNews).
     if (result?.success) flushTelegramSync()
     return result
   } catch (error) {
@@ -228,7 +228,6 @@ export const sortNewest = (list, field = 'createdAt') => [...list].sort(byNewest
 // `meta` carries what the admin's feed shows beyond the headline: the products in an "added to shop"
 // line, the payout method of a withdrawal, the place and device of a sign-up.
 export function stageActivity(db, writer, { adminId, sellerId, actorId, type, title, entity, icon, amount, meta }) {
-  if (actorId && actorId === sellerId) markTelegramNews(db)
   const ref = doc(collection(db, COL.activity))
   writer.set(ref, clean({ adminId, sellerId, actorId, type, title, entity, icon, amount, meta: meta && Object.keys(clean(meta)).length ? clean(meta) : undefined, at: nowIso() }))
 }
@@ -238,10 +237,6 @@ export async function pushActivity(db, entry) {
   try {
     const ref = doc(collection(db, COL.activity))
     await setDoc(ref, clean({ ...entry, at: nowIso() }))
-    if (entry.actorId && entry.actorId === entry.sellerId) {
-      markTelegramNews(db)
-      flushTelegramSync()
-    }
   } catch (_) {}
 }
 
@@ -378,11 +373,12 @@ export const saveDeviceLabel = (db, adminId, key, label) =>
   })
 
 // ---- admin: Telegram alerts -----------------------------------------------------------------------
-// An admin can link a Telegram chat and get their dashboard's notifications there. The link itself is
-// made and kept by the relay in api/ (see api/telegram.js: it runs on Vercel, with the bot token); the
-// admin only reads it and switches things on and off here.
+// An admin can link a Telegram chat and get a message there whenever a seller writes to them in support
+// chat — and nothing else (no KYC, sign-ups, withdrawals, orders, sign-ins or chat photos). The link itself
+// is made and kept by the relay in api/ (see api/telegram.js: it runs on Vercel, with the bot token); the
+// admin only reads it and switches it on and off here.
 
-export const DEFAULT_TELEGRAM_PREFS = { activity: true, support: true, logins: false }
+export const DEFAULT_TELEGRAM_PREFS = { support: true }
 
 // Calls back with the admin's link (`{ chatName, enabled, prefs, ... }`), or null while none is connected.
 export function watchTelegram(db, adminId, onData, onError = () => {}) {
@@ -398,7 +394,8 @@ export const saveTelegramSettings = (db, adminId, { enabled, prefs = {} }) =>
     const chosen = { ...DEFAULT_TELEGRAM_PREFS, ...prefs }
     await updateDoc(doc(db, COL.adminTelegram, adminId), {
       enabled: !!enabled,
-      prefs: { activity: !!chosen.activity, support: !!chosen.support, logins: !!chosen.logins },
+      // The security rules still expect the three choices of the first version; the relay only reads `support`.
+      prefs: { activity: false, support: !!chosen.support, logins: false },
     })
     return { success: true }
   })
@@ -431,10 +428,10 @@ export async function telegramRequest(db, action, { keepalive = false } = {}) {
   }
 }
 
-// When a seller does something their admin should hear about, the relay is told shortly after it has
-// committed, and it sends whatever is new to the admin's Telegram. Marking happens where the record is
-// written; the telling happens once the write has gone through (an `attempt` that succeeded, or right after
-// a direct write), and a burst of actions shares one call. A no-op outside a browser and on the emulators.
+// When a seller writes to their admin in support chat, the relay is told shortly after it has committed,
+// and it sends the new message to the admin's Telegram. Marking happens where the note is written; the
+// telling happens once the write has gone through (an `attempt` that succeeded), and a burst of messages
+// shares one call. A no-op outside a browser and on the emulators.
 let newsDb = null
 let syncTimer = null
 
@@ -516,8 +513,6 @@ export async function recordSellerLogin(db, shop, { device = describeDevice(), w
     batch.update(doc(db, COL.shops, shop.id), { lastActiveAt: at })
     batch.set(doc(collection(db, COL.loginHistory)), clean({ sellerId: shop.id, adminId: shop.adminId, at, device, ip: found?.ip || undefined, location: found?.location || undefined }))
     await batch.commit()
-    markTelegramNews(db)
-    flushTelegramSync()
   } catch (_) {}
 }
 

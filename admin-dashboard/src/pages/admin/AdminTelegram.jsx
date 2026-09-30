@@ -5,9 +5,7 @@ import { Icon } from '../../components/activity/icons'
 
 // What can be switched on and off, in the order shown. The keys are the ones the relay understands (api/_lib/sync.js).
 const KINDS = [
-  { key: 'activity', title: 'Seller activity', hint: "New sign-ups and KYC resubmissions (with the seller's details and their ID photos and PDFs), order payments, withdrawal requests, payout methods and product changes." },
-  { key: 'support', title: 'Support messages', hint: "A message a seller writes to you in support chat, and any photo they send with it." },
-  { key: 'logins', title: 'Seller sign-ins', hint: 'Every time a seller logs in. Handy, but it can get chatty.' },
+  { key: 'support', title: 'Support messages', hint: "A message a seller writes to you in support chat. A photo they attach is not sent: open the dashboard to see it." },
 ]
 
 const failureText = (failure) =>
@@ -97,7 +95,7 @@ const AdminTelegram = () => {
         <Icon name="send" className="h-7 w-7 text-indigo-600" strokeWidth={2} />
         <h1 className="text-3xl font-black leading-tight text-slate-900">Telegram Alerts</h1>
       </div>
-      <p className="mt-1 text-[15px] text-slate-500">Get your dashboard notifications on Telegram, so you hear about a new seller or withdrawal even when this page is closed.</p>
+      <p className="mt-1 text-[15px] text-slate-500">Get a Telegram message whenever a seller writes to you in support chat, so you hear about it even when this page is closed.</p>
 
       {locked && (
         <p className="mt-4 rounded-xl bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-700">
@@ -199,7 +197,7 @@ const AdminTelegram = () => {
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
               <div>
                 <h2 className="text-[17px] font-bold text-slate-900">Send notifications</h2>
-                <p className="text-sm text-slate-500">{link.enabled !== false ? 'On: new activity is sent to Telegram.' : 'Paused: nothing is sent, and nothing is stored up for later.'}</p>
+                <p className="text-sm text-slate-500">{link.enabled !== false ? 'On: new support messages are sent to Telegram.' : 'Paused: nothing is sent, and nothing is stored up for later.'}</p>
               </div>
               <Switch checked={link.enabled !== false} disabled={!!busy || locked} label="Send notifications to Telegram" onChange={(enabled) => save({ enabled })} />
             </div>
@@ -224,7 +222,7 @@ const AdminTelegram = () => {
       )}
 
       <p className="mt-6 text-xs leading-relaxed text-slate-400">
-        Alerts are short summaries: who did what, and any amount. The exception is a new seller's KYC: their details and ID photos or PDFs are sent too (they come with Seller activity; switch that off to stop them). Telegram bot messages are not end-to-end encrypted, so use a private chat rather than a group for this. Passwords and PINs are never sent. Send /stop to the bot in a private chat to disconnect from Telegram itself.
+        Only support messages are sent: who wrote, and what they said. KYC requests and their documents, withdrawals, orders, sign-ins and chat photos are never sent to Telegram. Telegram bot messages are not end-to-end encrypted, so use a private chat rather than a group for this. Passwords and PINs are never sent. Send /stop to the bot in a private chat to disconnect from Telegram itself.
       </p>
     </div>
   )

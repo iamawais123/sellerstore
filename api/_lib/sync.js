@@ -1,72 +1,51 @@
 // Turns what happened in an admin's network into Telegram messages, once each.
 //
-// There is no server to react to Firestore writes (free Spark plan), so the apps tell the relay
-// "something may have happened" after a seller acts (see flushTelegramSync in shopData.js) and this
-// looks for what is new:
+// Only one thing is ever sent: a message a seller writes to the admin in support chat. Nothing else is
+// forwarded — not sign-ups, KYC (details or identity documents), withdrawals, orders, sign-ins, nor the
+// photo a seller attaches to a chat message (its alert says "📷 Photo"; the picture stays in the dashboard).
 //
-//   adminTelegram/{adminId}   the admin's link: chat, on/off, which kinds to send, and the bookkeeping
-//                             below. The relay writes it; the admin can only change `enabled` / `prefs`.
-//   cursor.<kind>             how far into that kind of record we have already looked (ISO time), or
-//                             null while the kind is switched off. Switching it on starts from "now": what
-//                             is already there is marked as seen (`sent`), never sent as a backlog.
+// There is no server to react to Firestore writes (free Spark plan), so the apps tell the relay
+// "something may have happened" after a seller writes in support chat (see flushTelegramSync in
+// shopData.js) and this looks for what is new:
+//
+//   adminTelegram/{adminId}   the admin's link: chat, on/off, whether support messages are wanted, and the
+//                             bookkeeping below. The relay writes it; the admin can only change `enabled` /
+//                             `prefs`. Links made before this was narrowed to support messages still carry
+//                             `activity` / `logins` choices and cursors: they are ignored.
+//   cursor.support            how far into the support notifications we have already looked (ISO time), or
+//                             null while they are switched off. Switching them on starts from "now": what is
+//                             already there is marked as seen (`sent`), never sent as a backlog.
 //   sent                      the ids of the last few hundred records already sent. Records are dated by
 //                             the seller's own clock, so each look reaches back a little past the cursor
 //                             and this list is what stops those from going out twice.
 //
 // A lost ping is harmless: the next one finds everything after the cursor.
-import { composeMessages, renderActivity, renderLogin, renderSupport } from './format.js'
-import { sendChatPhoto } from './chatPhoto.js'
-import { KYC_TYPES, sendKyc } from './kyc.js'
-import { isChatGone, sendStoredFile } from './telegram.js'
+import { composeMessages, renderSupport } from './format.js'
+import { isChatGone } from './telegram.js'
 
-export const DEFAULT_PREFS = { activity: true, support: true, logins: false }
+export const DEFAULT_PREFS = { support: true }
 export const PREF_KEYS = Object.keys(DEFAULT_PREFS)
 
 const LOOKBACK_MS = 10 * 60 * 1000
 const FETCH_LIMIT = 40
 const REMEMBER = 300
 
-// What a record brings along besides its alert: a sign-up or KYC resubmission brings the seller's KYC (details and
-// identity documents), a support message may bring the photo the seller attached. Each is sent, retried and
-// remembered on its own (its own id in the list of sent ids), so a failure never repeats the alert.
-const EXTRAS = {
-  activity: (row) => (KYC_TYPES.has(row.type) ? 'kyc' : null),
-  support: () => 'photo',
-}
-const extraOf = (source, row) => EXTRAS[source.key]?.(row) || null
-
-// The ids one record is remembered by.
-const idsOf = (source, id, row) => [`${source.key}:${id}`, ...(extraOf(source, row) ? [`${extraOf(source, row)}:${id}`] : [])]
-
 const byAdmin = (collection, adminId) => collection.where('adminId', '==', adminId)
 
 const SOURCES = [
   {
-    key: 'activity',
-    collection: 'activityLogs',
-    time: 'at',
-    // What the seller did themselves; what the admin (or a super admin) did is not news to them.
-    keep: (row) => !!row.sellerId && row.actorId === row.sellerId,
-    query: (collection, adminId, since) => byAdmin(collection, adminId).where('at', '>', since).orderBy('at', 'desc').limit(FETCH_LIMIT),
-  },
-  {
     key: 'support',
     collection: 'notifications',
     time: 'createdAt',
+    // What a seller wrote to the admin (the bell in the dashboard); the admin's own replies are notes for the seller.
     keep: (row) => row.type === 'chat',
     query: (collection, adminId, since) =>
       byAdmin(collection, adminId).where('recipient', '==', 'admin').where('createdAt', '>', since).orderBy('createdAt', 'desc').limit(FETCH_LIMIT),
   },
-  {
-    key: 'logins',
-    collection: 'loginHistory',
-    time: 'at',
-    keep: (row) => row.ip !== 'Admin impersonation',
-    query: (collection, adminId, since) => byAdmin(collection, adminId).where('at', '>', since).orderBy('at', 'desc').limit(FETCH_LIMIT),
-  },
 ]
 
-export const prefsOf = (link) => ({ ...DEFAULT_PREFS, ...(link?.prefs || {}) })
+// The admin's choices, reduced to the ones that still exist (an older link may carry more).
+export const prefsOf = (link) => Object.fromEntries(PREF_KEYS.map((key) => [key, link?.prefs?.[key] ?? DEFAULT_PREFS[key]]))
 
 const later = (a, b) => (a && b ? (a > b ? a : b) : a || b || null)
 
@@ -77,7 +56,7 @@ const lookbackFrom = (iso) => new Date(Math.max(0, Date.parse(iso) - LOOKBACK_MS
 // out as if new; marked as seen, they never do.
 async function alreadyThere(db, source, adminId, nowIso) {
   const found = await source.query(db.collection(source.collection), adminId, lookbackFrom(nowIso)).get()
-  return found.docs.flatMap((doc) => idsOf(source, doc.id, doc.data()))
+  return found.docs.map((doc) => `${source.key}:${doc.id}`)
 }
 
 // A fresh start for every kind that is switched on: it counts from now, and what is there already is history.
@@ -99,7 +78,7 @@ export async function startCursors(db, adminId, prefs, nowIso) {
 }
 
 // Looks for records newer than the admin's cursors and sends them. `send(chatId, html)` delivers one message.
-export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, dashboardUrl = '', now = Date.now }) {
+export async function syncAdmin({ db, adminId, send, dashboardUrl = '', now = Date.now }) {
   const ref = db.collection('adminTelegram').doc(adminId)
   const snap = await ref.get()
   if (!snap.exists) return { sent: 0 }
@@ -119,8 +98,8 @@ export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, 
       after[source.key] = null
       continue
     }
-    // One kind that cannot be read (say its index is still building) must not silence the others:
-    // it is skipped, keeps its cursor, and is tried again on the next look.
+    // One kind that cannot be read (say its index is still building) is skipped, keeps its cursor, and is
+    // tried again on the next look.
     let found
     try {
       if (!before[source.key]) {
@@ -140,8 +119,6 @@ export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, 
       // A clock that runs ahead must not push the cursor into the future and hide what comes next.
       newest = later(newest, at > nowIso ? nowIso : at)
       candidates.push({ id: `${source.key}:${doc.id}`, source, row, at })
-      const extra = extraOf(source, row)
-      if (extra) candidates.push({ id: `${extra}:${doc.id}`, source, row, at, extra })
     }
     after[source.key] = newest
   }
@@ -163,54 +140,21 @@ export async function syncAdmin({ db, adminId, send, sendFile = sendStoredFile, 
   })
   if (!claimed.length) return { sent: 0 }
 
-  const alerts = claimed.filter((item) => !item.extra).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
-  const packages = claimed.filter((item) => item.extra).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
-  const gone = async () => {
-    // Blocked the bot or removed it from the group: stop trying, and tell the admin on the page.
-    await ref.update({ enabled: false, lastError: 'Telegram says the bot can no longer message this chat. Connect again to keep getting alerts.', lastErrorAt: nowIso })
-    return { sent: 0 }
-  }
-
-  // First the short alerts.
-  if (alerts.length) {
-    const names = await sellerNames(db, alerts.filter((item) => item.source.key === 'logins').map((item) => item.row.sellerId))
-    const items = alerts.map(({ source, row }) =>
-      source.key === 'activity' ? renderActivity(row) : source.key === 'support' ? renderSupport(row) : renderLogin(row, names.get(row.sellerId))
-    )
-    try {
-      for (const message of composeMessages(items, { dashboardUrl })) await send(link.chatId, message)
-    } catch (error) {
-      if (isChatGone(error)) return gone()
-      await giveBack(db, ref, claimed, before)
-      throw error
+  const alerts = claimed.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+  try {
+    for (const message of composeMessages(alerts.map(({ row }) => renderSupport(row)), { dashboardUrl })) await send(link.chatId, message)
+  } catch (error) {
+    if (isChatGone(error)) {
+      // Blocked the bot or removed it from the group: stop trying, and tell the admin on the page.
+      await ref.update({ enabled: false, lastError: 'Telegram says the bot can no longer message this chat. Connect again to keep getting alerts.', lastErrorAt: nowIso })
+      return { sent: 0 }
     }
-  }
-
-  // Then what came along: a new seller's KYC, a photo from a chat. One that fails is put back on its own, so the
-  // alerts above are never sent twice.
-  const failed = []
-  let firstError = null
-  const done = { kyc: 0, photos: 0 }
-  for (const item of packages) {
-    try {
-      if (item.extra === 'kyc') {
-        if (await sendKyc({ db, adminId, sellerId: item.row.sellerId, chatId: link.chatId, send, sendFile, dashboardUrl })) done.kyc += 1
-      } else if (await sendChatPhoto({ db, adminId, note: item.row, chatId: link.chatId, sendFile })) {
-        done.photos += 1
-      }
-    } catch (error) {
-      if (isChatGone(error)) return gone()
-      failed.push(item)
-      firstError = firstError || error
-    }
-  }
-  if (failed.length) {
-    await giveBack(db, ref, failed, before)
-    throw firstError
+    await giveBack(db, ref, claimed, before)
+    throw error
   }
 
   if (link.lastError) await ref.update({ lastError: null, lastErrorAt: null })
-  return { sent: alerts.length, ...(done.kyc ? { kyc: done.kyc } : {}), ...(done.photos ? { photos: done.photos } : {}) }
+  return { sent: alerts.length }
 }
 
 // A send that failed for a passing reason: put the records back so the next look sends them.
@@ -228,14 +172,4 @@ async function giveBack(db, ref, claimed, cursorBefore) {
       })
     })
   } catch (_) {}
-}
-
-async function sellerNames(db, sellerIds) {
-  const names = new Map()
-  const unique = [...new Set(sellerIds.filter(Boolean))]
-  const shops = await Promise.all(unique.map((id) => db.collection('shops').doc(id).get()))
-  shops.forEach((shop, index) => {
-    if (shop.exists) names.set(unique[index], shop.data().fullName || shop.data().shopName || '')
-  })
-  return names
 }

@@ -66,7 +66,7 @@ export async function disconnectAdmin({ db, adminId }) {
 }
 
 const HELP =
-  'Hi! I send your admin dashboard notifications here.\n\nOpen <b>Telegram Alerts</b> in your admin dashboard and press <b>Connect Telegram</b> to link this chat.'
+  'Hi! I send you a message here whenever a seller writes to you in support chat.\n\nOpen <b>Telegram Alerts</b> in your admin dashboard and press <b>Connect Telegram</b> to link this chat.'
 
 // One Telegram update (a message someone sent the bot). Never throws for a message it does not understand.
 export async function handleUpdate({ db, update, send, now = Date.now }) {
@@ -83,7 +83,7 @@ export async function handleUpdate({ db, update, send, now = Date.now }) {
     return send(
       chat.id,
       adminId
-        ? '✅ <b>Connected.</b>\nYou will get your admin dashboard notifications here. You can choose what to receive, and pause or disconnect, on the Telegram Alerts page.'
+        ? '✅ <b>Connected.</b>\nYou will get a message here whenever a seller writes to you in support chat. You can pause or disconnect on the Telegram Alerts page.'
         : 'This link has expired or was already used. Open <b>Telegram Alerts</b> in your admin dashboard and press <b>Connect Telegram</b> again.'
     )
   }
@@ -94,6 +94,6 @@ export async function handleUpdate({ db, update, send, now = Date.now }) {
     if (chat.type !== 'private') return send(chat.id, 'To disconnect this chat, use the Telegram Alerts page in your admin dashboard.')
     const found = await db.collection('adminTelegram').where('chatId', '==', chat.id).get()
     await Promise.all(found.docs.map((doc) => doc.ref.delete()))
-    return send(chat.id, found.empty ? 'Nothing is connected to this chat.' : '🔕 Disconnected. You will not get notifications here any more.')
+    return send(chat.id, found.empty ? 'Nothing is connected to this chat.' : '🔕 Disconnected. You will not get support message alerts here any more.')
   }
 }

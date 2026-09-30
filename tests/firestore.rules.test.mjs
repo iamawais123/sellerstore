@@ -608,7 +608,8 @@ describe('Telegram link (adminTelegram)', () => {
 
   it('keeps everything else for the relay: chat, cursors and history cannot be edited', async () => {
     const s = db('a1')
-    for (const changes of [{ chatId: 1 }, { chatName: 'Someone' }, { cursor: {} }, { sent: [] }, { adminId: 'a2' }, { lastError: null }]) {
+    // (`sent: [...]` must really change it: rewriting a field with the value it already has is a harmless no-op)
+    for (const changes of [{ chatId: 1 }, { chatName: 'Someone' }, { cursor: {} }, { sent: ['x'] }, { adminId: 'a2' }, { lastError: null }]) {
       await assertFails(updateDoc(doc(s, 'adminTelegram/a1'), changes))
     }
   })
@@ -624,7 +625,8 @@ describe('Telegram link (adminTelegram)', () => {
   it('refuses anyone else\'s changes, and any create or delete from a browser', async () => {
     await assertFails(updateDoc(doc(db('sa1'), 'adminTelegram/a1'), { enabled: false }))
     await assertFails(updateDoc(doc(db('s1'), 'adminTelegram/a1'), { enabled: false }))
-    await assertFails(setDoc(doc(db('a1'), 'adminTelegram/a1'), link))
+    // the link exists: writing it again with a different chat is an update the rules refuse (the same data would be a no-op)
+    await assertFails(setDoc(doc(db('a1'), 'adminTelegram/a1'), { ...link, chatId: 1 }))
     await assertFails(deleteDoc(doc(db('a1'), 'adminTelegram/a1')))
     await env.withSecurityRulesDisabled(async (ctx) => deleteDoc(doc(ctx.firestore(), 'adminTelegram/a1')))
     await assertFails(setDoc(doc(db('a1'), 'adminTelegram/a1'), link))
