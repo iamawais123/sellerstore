@@ -24,6 +24,39 @@ const KycApprovedModal = ({ onContinue }) => (
   </div>
 )
 
+// The header of the dashboard: whose store this is, and the three numbers a seller opens it for.
+const StoreBanner = ({ shopName, verified, balance, revenue, profit }) => {
+  const figures = [
+    { label: 'Shop balance', value: balance },
+    { label: 'Total revenue', value: revenue },
+    { label: 'Total profit', value: profit },
+  ]
+  return (
+    <section aria-label="Your store" className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0a3d62] to-[#0f4c81] p-5 text-white shadow-md lg:p-7">
+      <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/5" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 right-24 h-48 w-48 rounded-full bg-white/5" />
+      <div className="relative flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">Your store</p>
+          <h1 className="mt-1 truncate text-2xl font-black leading-tight sm:text-3xl">{shopName || 'My Shop'}</h1>
+        </div>
+        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${verified ? 'bg-emerald-400/20 text-emerald-100' : 'bg-amber-400/20 text-amber-100'}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${verified ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+          {verified ? 'Verified store' : 'Verification pending'}
+        </span>
+      </div>
+      <dl className="relative mt-5 grid grid-cols-1 gap-3 min-[460px]:grid-cols-3">
+        {figures.map((figure) => (
+          <div key={figure.label} className="min-w-0 rounded-2xl bg-white/10 px-4 py-3.5 ring-1 ring-white/10">
+            <dt className="text-xs font-semibold uppercase tracking-wider text-white/60">{figure.label}</dt>
+            <dd className="mt-1 truncate text-2xl font-black tabular-nums lg:text-3xl">${Number(figure.value || 0).toFixed(2)}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
 const SellerDashboard = () => {
   const { seller, getSellerActivityStats, getSellerOrders, getSellerSlotInfo, getSellerShopProductsFull, acknowledgeKyc } = useAuth()
   const [ackDismissed, setAckDismissed] = useState(false)
@@ -198,6 +231,8 @@ const SellerDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <StoreBanner shopName={seller.shopName} verified={seller.verified} balance={activity.shopBalance} revenue={activity.revenue} profit={activity.profit} />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
         {bigStatCards.map((card, i) => (
           <div
