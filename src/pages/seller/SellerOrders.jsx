@@ -55,6 +55,7 @@ const PayConfirmModal = ({ order, seller, onClose, onConfirm, error, busy }) => 
           <div className="flex justify-between p-3.5 text-sm"><span className="font-bold text-gray-500">Total quantity</span><span className="font-black text-gray-900">{order.qty}</span></div>
           <div className="flex justify-between p-3.5 text-sm"><span className="font-bold text-gray-500">Seller cost</span><span className="font-black text-gray-900">{money(order.cost)}</span></div>
           <div className="flex justify-between p-3.5 text-sm"><span className="font-bold text-gray-500">Profit on delivery</span><span className="font-black text-emerald-600">+{money(order.profit)}</span></div>
+          <div className="flex justify-between p-3.5 text-sm"><span className="font-bold text-gray-500">Credited on delivery (cost + profit)</span><span className="font-black text-emerald-600">+{money((order.cost || 0) + (order.profit || 0))}</span></div>
           <div className="flex justify-between p-3.5 text-sm"><span className="font-bold text-gray-500">Shop balance after</span><span className={`font-black ${insufficient ? 'text-rose-600' : 'text-gray-900'}`}>{money(balanceAfter)}</span></div>
         </div>
 

@@ -46,9 +46,13 @@ before(async () => {
 after(async () => env?.cleanup())
 beforeEach(seed)
 
-const ITEM = { catalogId: 'p1', name: 'Widget', qty: 2, cost: 15, sell: 25 } // cost 30, sell 50
-// With no seller profitRatio set, profit falls back to a random 18%-20% of the sale total.
-const inFallbackRange = (total, profit) => profit >= total * 0.18 - 0.01 && profit <= total * 0.2 + 0.01
+const ITEM = { catalogId: 'p1', name: 'Widget', qty: 2, cost: 15, sell: 25 } // sells for 50
+// The same product with its default profit share already rolled (as the order wizard does): 20% of 50,
+// so the order is exactly total 50 = seller pays 40 + profit 10.
+const PINNED = { ...ITEM, defaultRatio: 0.2 }
+// With no seller profitRatio set (or 0), profit falls back to a random 18%-22% of the sale total.
+const inFallbackRange = (total, profit) => profit >= total * 0.18 - 0.01 && profit <= total * 0.22 + 0.01
+const cents = (value) => Math.round(value * 100)
 
 // A verified, funded seller shop for s1 under a1, built through the same calls the apps make.
 async function verifiedShop({ balance = 100 } = {}) {
@@ -214,32 +218,72 @@ describe('balances', () => {
 })
 
 describe('orders', () => {
-  it('runs the whole flow: assign, pay, deliver — profit credited exactly once', async () => {
+  it('runs the whole flow: assign, pay, deliver — cost and profit credited exactly once', async () => {
     const target = await verifiedShop({ balance: 100 })
     const given = await shop.createOrder(db('a1'), target, { items: [ITEM], customer: { fullName: 'Buyer' } }, 'a1')
     assert.equal(given.success, true)
     assert.equal(given.order.total, 50)
-    assert.equal(given.order.cost, 30)
-    assert.ok(inFallbackRange(50, given.order.profit), 'profit falls in the 18%-20% fallback range')
-    const profit = given.order.profit
+    assert.ok(inFallbackRange(50, given.order.profit), 'profit falls in the 18%-22% fallback range')
+    // the order's money adds up: what the seller pays plus their profit is the order total
+    const { cost, profit } = given.order
+    assert.equal(cents(cost) + cents(profit), 5000)
 
-    // the seller sees it and pays
+    // the seller sees it and pays the cost
     const id = await orderId()
     assert.equal((await getDoc(doc(db('s1'), `orders/${id}`))).data().status, 'Unpaid')
     assert.equal((await shop.payOrder(db('s1'), 's1', id)).success, true)
-    assert.equal((await read(db('s1'), 'shops/s1')).balance, 70)
+    assert.equal(cents((await read(db('s1'), 'shops/s1')).balance), cents(100) - cents(cost))
     assert.equal((await shop.payOrder(db('s1'), 's1', id)).success, false, 'cannot pay twice')
 
-    // the admin moves it along and delivers
+    // the admin moves it along and delivers: the seller gets their cost back plus the profit — the whole total
     assert.equal((await shop.setOrderStatus(db('a1'), target, id, 'Pickup', 'a1')).success, true)
     assert.equal((await shop.setOrderStatus(db('a1'), target, id, 'Delivered', 'a1')).success, true)
-    assert.equal((await read(db('s1'), 'shops/s1')).balance, Math.round((70 + profit) * 100) / 100)
-    // moving it back and delivering again must not pay the profit a second time
+    assert.equal(cents((await read(db('s1'), 'shops/s1')).balance), cents(100) + cents(profit))
+    // moving it back and delivering again must not pay out a second time
     await shop.setOrderStatus(db('a1'), target, id, 'Out for delivery', 'a1')
     await shop.setOrderStatus(db('a1'), target, id, 'Delivered', 'a1')
     const after = await read(db('s1'), 'shops/s1')
-    assert.equal(after.balance, Math.round((70 + profit) * 100) / 100)
+    assert.equal(cents(after.balance), cents(100) + cents(profit))
     assert.deepEqual(after.orderStats, { total: 1, pending: 0, delivered: 1 })
+  })
+
+  it('pays a delivered order\'s whole total back, and says so in the seller\'s note and the activity feed', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    const given = await shop.createOrder(db('a1'), target, { items: [PINNED], customer: { fullName: 'Buyer' } }, 'a1')
+    assert.deepEqual([given.order.total, given.order.cost, given.order.profit], [50, 40, 10])
+    const id = await orderId()
+    assert.equal((await shop.payOrder(db('s1'), 's1', id)).success, true)
+    assert.equal((await read(db('s1'), 'shops/s1')).balance, 60)
+    assert.equal((await shop.setOrderStatus(db('a1'), target, id, 'Delivered', 'a1')).success, true)
+    assert.equal((await read(db('s1'), 'shops/s1')).balance, 110, '100 - 40 paid + 50 back (40 cost + 10 profit)')
+    const notes = await getDocs(query(collection(db('a1'), 'notifications'), where('adminId', '==', 'a1')))
+    assert.ok(notes.docs.some((d) => /\$50\.00 has been added to your shop balance \(\$40\.00 you paid \+ \$10\.00 profit\)/.test(d.data().message)))
+    const log = await getDocs(query(collection(db('a1'), 'activityLogs'), where('adminId', '==', 'a1')))
+    assert.ok(log.docs.some((d) => d.data().type === 'order_status_changed' && d.data().amount === 50 && d.data().meta?.credited === true))
+  })
+
+  it('does not hand back a cost the seller never paid when an unpaid order is delivered', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    await shop.createOrder(db('a1'), target, { items: [PINNED], customer: { fullName: 'Buyer' } }, 'a1')
+    const id = await orderId()
+    assert.equal((await shop.setOrderStatus(db('a1'), target, id, 'Delivered', 'a1')).success, true)
+    assert.equal((await read(db('s1'), 'shops/s1')).balance, 110, 'only the profit: 100 + 10')
+  })
+
+  it('treats a profit ratio of 0 as "use the default 18%-22%", and keeps a ratio that is set', async () => {
+    const target = await verifiedShop({ balance: 100 })
+    const reset = await shop.setProfitRatio(db('a1'), target, 0, 'a1')
+    assert.deepEqual([reset.success, reset.newRatio], [true, 0])
+    const zeroed = { ...target, profitRatio: 0 }
+    for (let run = 0; run < 5; run += 1) {
+      const given = await shop.createOrder(db('a1'), zeroed, { items: [ITEM], customer: { fullName: 'Buyer' } }, 'a1')
+      assert.equal(given.success, true)
+      assert.ok(given.order.profit > 0, 'a ratio of 0 must not mean zero profit')
+      assert.ok(inFallbackRange(50, given.order.profit), 'profit falls in the 18%-22% fallback range')
+      assert.equal(cents(given.order.cost) + cents(given.order.profit), 5000)
+    }
+    const feed = await getDocs(query(collection(db('a1'), 'activityLogs'), where('adminId', '==', 'a1')))
+    assert.ok(feed.docs.some((d) => d.data().type === 'seller_profit_ratio' && /default 18%-22%/.test(d.data().title)))
   })
 
   it('uses the seller\'s profit ratio for new orders instead of the random fallback', async () => {
@@ -261,7 +305,7 @@ describe('orders', () => {
     ]
     const given = await shop.createOrder(db('a1'), ratioed, { items, customer: { fullName: 'Buyer' } }, 'a1')
     assert.equal(given.success, true)
-    assert.deepEqual([given.order.total, given.order.cost, given.order.profit], [110, 70, 55])
+    assert.deepEqual([given.order.total, given.order.cost, given.order.profit], [110, 55, 55])
   })
 
   it('rolls the fallback ratio per product for a multi-item order with no seller ratio set', async () => {
@@ -272,8 +316,9 @@ describe('orders', () => {
     ]
     const given = await shop.createOrder(db('a1'), target, { items, customer: { fullName: 'Buyer' } }, 'a1')
     assert.equal(given.success, true)
-    assert.deepEqual([given.order.total, given.order.cost], [110, 70])
-    assert.ok(inFallbackRange(110, given.order.profit), 'profit falls in the 18%-20% fallback range')
+    assert.equal(given.order.total, 110)
+    assert.ok(inFallbackRange(110, given.order.profit), 'profit falls in the 18%-22% fallback range')
+    assert.equal(cents(given.order.cost) + cents(given.order.profit), 11000, 'seller pays + profit is the order total')
   })
 
   it('refuses payment when the balance is too low', async () => {
@@ -291,7 +336,7 @@ describe('orders', () => {
     const id = await orderId()
     // marking it paid with no balance change
     await assertFails(updateDoc(doc(db('s1'), `orders/${id}`), { status: 'Paid', paidAt: now }))
-    // paying 1 instead of 30
+    // paying 1 instead of the order's cost
     const s = db('s1')
     const cheat = writeBatch(s)
     cheat.update(doc(s, `orders/${id}`), { status: 'Paid', paidAt: now })
@@ -351,8 +396,9 @@ describe('scheduled orders', () => {
     const id = await give(target)
     const [stored] = await schedulesOf()
     assert.equal(stored.status, 'Scheduled')
-    assert.deepEqual([stored.total, stored.cost, stored.qty], [50, 30, 2])
-    assert.ok(inFallbackRange(50, stored.profit), 'profit falls in the 18%-20% fallback range')
+    assert.deepEqual([stored.total, stored.qty], [50, 2])
+    assert.ok(inFallbackRange(50, stored.profit), 'profit falls in the 18%-22% fallback range')
+    assert.equal(cents(stored.cost) + cents(stored.profit), 5000, 'seller pays + profit is the order total')
     assert.equal((await ordersOf()).length, 0)
     assert.equal((await read(db('a1'), 'shops/s1')).orderStats.total, 0)
     await assertFails(getDoc(doc(db('s1'), `scheduledOrders/${id}`)))
@@ -388,8 +434,9 @@ describe('scheduled orders', () => {
     assert.equal(order.id, forced.orderId)
     assert.equal(order.status, 'Unpaid')
     assert.equal(order.customer.fullName, 'Buyer')
-    assert.deepEqual([order.total, order.cost], [50, 30])
-    assert.ok(inFallbackRange(50, order.profit), 'profit falls in the 18%-20% fallback range')
+    assert.equal(order.total, 50)
+    assert.ok(inFallbackRange(50, order.profit), 'profit falls in the 18%-22% fallback range')
+    assert.equal(cents(order.cost) + cents(order.profit), 5000, 'seller pays + profit is the order total')
     assert.ok(order.scheduledFor)
     const [stored] = await schedulesOf()
     assert.deepEqual([stored.status, stored.orderId], ['Created', order.id])
@@ -872,9 +919,9 @@ describe('what Recent Actions and My Logs read', () => {
 
   it('gives an order payment its amount', async () => {
     const target = await verifiedShop({ balance: 100 })
-    const created = await shop.createOrder(db('a1'), target, { items: [ITEM] }, 'a1')
+    const created = await shop.createOrder(db('a1'), target, { items: [PINNED] }, 'a1')
     assert.equal((await shop.payOrder(db('s1'), 's1', created.order.id)).success, true)
-    assert.equal((await lastActivity('order_paid'))[0].amount, 30)
+    assert.equal((await lastActivity('order_paid'))[0].amount, 40)
   })
 
   it('carries the place and device of a sign-up in the activity line, and refuses stray fields', async () => {
@@ -913,14 +960,14 @@ describe('what Recent Actions and My Logs read', () => {
 describe('"log in as" sessions use the impersonator\'s identity', () => {
   it('lets an admin act as their seller: pay an order, request a withdrawal, manage the catalogue', async () => {
     const target = await verifiedShop({ balance: 100 })
-    await shop.createOrder(db('a1'), target, { items: [ITEM] }, 'a1')
+    await shop.createOrder(db('a1'), target, { items: [PINNED] }, 'a1')
     const id = await orderId()
     assert.equal((await shop.payOrder(db('a1'), 's1', id, 'a1')).success, true)
-    assert.equal((await read(db('a1'), 'shops/s1')).balance, 70)
+    assert.equal((await read(db('a1'), 'shops/s1')).balance, 60)
     assert.equal((await shop.requestWithdrawal(db('a1'), 's1', 20, { label: 'x' }, 'a1')).success, true)
     assert.equal((await shop.addProductsToShop(db('a1'), 's1', ['p1'], 'a1')).success, true)
     assert.equal((await shop.sendSupportMessage(db('a1'), target, 'seller', 'from the seller portal')).success, true)
-    assert.equal((await read(db('a1'), 'shops/s1')).balance, 50)
+    assert.equal((await read(db('a1'), 'shops/s1')).balance, 40)
   })
 
   it('lets an admin\'s "log in as seller" session listen to the seller\'s data, if the query names the admin', async () => {

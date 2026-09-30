@@ -154,7 +154,7 @@ export function eventsFromActivity(row, seller) {
       push({ category: 'balance', text: `Deducted from seller balance — ${signedMoney(-cents(amount))} (shop_balance)` })
       break
     case 'order_status_changed':
-      if (meta.credited) push({ category: 'balance', text: `Order delivered — profit credited — ${signedMoney(cents(amount))} (shop_balance)` })
+      if (meta.credited) push({ category: 'balance', text: `Order delivered — payout credited —${signedMoney(cents(amount))} (shop_balance)` })
       else push({ category: 'other', text: row.title })
       break
     case 'seller_impersonate':

@@ -1071,7 +1071,8 @@ const ProductLimitModal = ({ seller, onClose }) => {
 
 const ProfitRatioModal = ({ seller, onClose }) => {
   const { adjustSellerProfitRatio } = useAuth()
-  const hasRatio = seller.profitRatio != null
+  // A ratio of 0 is the same as none: the seller gets the default random 18%-22%.
+  const hasRatio = seller.profitRatio > 0
   const [percent, setPercent] = useState(String(hasRatio ? Math.round(seller.profitRatio * 100) : 0))
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -1089,7 +1090,7 @@ const ProfitRatioModal = ({ seller, onClose }) => {
     if (Number.isNaN(value) || value < 0 || value > 100) return setError('Enter a percentage between 0 and 100')
     const res = await adjustSellerProfitRatio(seller.id, value / 100)
     if (res.success) {
-      setSuccess('Profit ratio updated')
+      setSuccess(value > 0 ? 'Profit ratio updated' : 'Profit ratio reset to the default 18%–22%')
       setTimeout(() => { onClose() }, 800)
     } else {
       setError(res.error || 'Failed')
@@ -1111,7 +1112,7 @@ const ProfitRatioModal = ({ seller, onClose }) => {
                 {hasRatio ? (
                   <>Current: <span className="font-black text-gray-800">{Math.round(seller.profitRatio * 100)}%</span> of each order's sale value</>
                 ) : (
-                  'Not set — this seller currently gets a random 18%-20% of each product’s sale value'
+                  'Default — this seller currently gets a random 18%–22% of each product’s sale value'
                 )}
               </p>
             </div>
@@ -1151,7 +1152,7 @@ const ProfitRatioModal = ({ seller, onClose }) => {
               </button>
             </div>
             <p className="mt-2 text-xs text-gray-400">
-              Applies to orders given to this seller from now on. This order's profit is credited to their balance once it's marked Delivered.
+              Applies to orders given to this seller from now on. Leave it at 0 to use the default random 18%–22%. When an order is marked Delivered, the seller gets back what they paid plus this profit.
             </p>
           </div>
 
@@ -1989,7 +1990,7 @@ const AdminSellers = () => {
                     <div className="shrink-0 text-right">
                       <p className="text-base font-black leading-tight text-gray-900">{money2(s.balance)}</p>
                       <p className="text-[10.5px] font-medium text-gray-400">Guarantee {money2(s.guarantee)}</p>
-                      {s.profitRatio != null && <p className="text-[10.5px] font-medium text-gray-400">Profit {Math.round(s.profitRatio * 100)}%</p>}
+                      {s.profitRatio > 0 && <p className="text-[10.5px] font-medium text-gray-400">Profit {Math.round(s.profitRatio * 100)}%</p>}
                     </div>
                   </div>
                   <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 sm:hidden">
@@ -2138,7 +2139,7 @@ const AdminSellers = () => {
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Balance</p>
                     <p className="text-xl font-black leading-tight text-gray-900">{money2(s.balance)}</p>
                     <p className="text-xs font-medium text-gray-400">Guarantee {money2(s.guarantee)}</p>
-                    {s.profitRatio != null && <p className="text-xs font-medium text-gray-400">Profit ratio {Math.round(s.profitRatio * 100)}%</p>}
+                    {s.profitRatio > 0 && <p className="text-xs font-medium text-gray-400">Profit ratio {Math.round(s.profitRatio * 100)}%</p>}
                   </div>
                 </div>
               </li>

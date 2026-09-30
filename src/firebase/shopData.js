@@ -1166,14 +1166,16 @@ export const setProductLimit = (db, target, value, actorId) =>
 
 // The share of each order's sale value this seller keeps as profit (0 to 1), set by the admin. Orders
 // created after this is set lock in the ratio at creation time; earlier orders keep whatever profit
-// they were already given. A seller with no ratio set falls back to the catalogue's markup (see
+// they were already given. 0 means "no ratio": the seller gets the default random 18%-22% (see
 // `computeOrderTotals`).
 export const setProfitRatio = (db, target, value, actorId) =>
   attempt(async () => {
     const ratio = parseFloat(value)
     if (Number.isNaN(ratio) || ratio < 0 || ratio > 1) return { success: false, error: 'Profit ratio must be between 0% and 100%' }
     const rounded = Math.round(ratio * 10000) / 10000
-    await editShop(db, target, { profitRatio: rounded }, { type: 'seller_profit_ratio', title: `Profit ratio set to ${Math.round(rounded * 100)}%`, icon: 'trending' }, actorId)
+    const [low, high] = DEFAULT_PROFIT_RANGE
+    const title = rounded > 0 ? `Profit ratio set to ${Math.round(rounded * 100)}%` : `Profit ratio reset to the default ${Math.round(low * 100)}%-${Math.round(high * 100)}%`
+    await editShop(db, target, { profitRatio: rounded }, { type: 'seller_profit_ratio', title, icon: 'trending' }, actorId)
     return { success: true, newRatio: rounded }
   })
 
@@ -1282,20 +1284,42 @@ export const sendNotification = (db, target, notification, actorId) =>
 
 // ---- admin: orders ----------------------------------------------------------------------------------
 
-// A seller with no ratio set gets a random share of that product's sale value instead, rolled fresh
-// for each product (not once for the whole order) so a multi-item order isn't all-or-nothing on a
-// single roll.
-const randomFallbackRatio = () => 0.18 + Math.random() * 0.02
+// A seller with no ratio set (or set to 0) gets a random 18%-22% share of each product's sale value,
+// rolled fresh for each product (not once for the whole order) so a multi-item order isn't
+// all-or-nothing on a single roll.
+export const DEFAULT_PROFIT_RANGE = [0.18, 0.22]
+export const rollProfitRatio = () => {
+  const [low, high] = DEFAULT_PROFIT_RANGE
+  return Math.round((low + Math.random() * (high - low)) * 10000) / 10000
+}
 
-// `profitRatio` (0 to 1), when the seller has one set by the admin, decides the seller's profit as
-// that share of each product's own sale value (qty × sell), summed across the order — not the
-// order's total cost. A seller with no ratio set instead gets a random 18%-20% share per product
-// (see `randomFallbackRatio`); the admin can raise it any time from Sellers → ⋮ → Profit Ratio.
-export const computeOrderTotals = (items, profitRatio) => {
-  const total = items.reduce((sum, item) => sum + item.sell * item.qty, 0)
-  const cost = items.reduce((sum, item) => sum + item.cost * item.qty, 0)
-  const profit = items.reduce((sum, item) => sum + item.sell * item.qty * (profitRatio != null ? profitRatio : randomFallbackRatio()), 0)
-  return { total: round2(total), cost: round2(cost), profit: round2(profit) }
+// A ratio the admin really set. 0 is what the Profit Ratio box shows for "nothing set", so it means
+// "use the default" just like a missing one.
+export const hasProfitRatio = (ratio) => typeof ratio === 'number' && ratio > 0 && ratio <= 1
+
+// The share of its sale value one product earns the seller: the seller's own ratio when they have one,
+// else the default share already rolled for this product (`defaultRatio` — the order wizard rolls it
+// when the product is picked, so the profit the admin reviews is the profit that is stored), else a
+// fresh roll.
+export const itemProfitRatio = (item, sellerRatio) =>
+  hasProfitRatio(sellerRatio) ? sellerRatio : hasProfitRatio(item.defaultRatio) ? item.defaultRatio : rollProfitRatio()
+
+// An order's money always adds up: `total` (what the products sell for, qty × sell) is split into the
+// seller's `profit` — each product's share of its own sale value (see `itemProfitRatio`), rounded to
+// the cent per product and summed, so it matches the per-product lines the admin reviews — and `cost`,
+// what the seller pays to start the order, which is whatever is left. So total = cost + profit to the
+// cent. (The catalogue's own per-product cost is not used: it would not add up to the total.)
+export const computeOrderTotals = (items, sellerRatio) => {
+  const total = round2(items.reduce((sum, item) => sum + round2(item.sell * item.qty), 0))
+  const profit = round2(items.reduce((sum, item) => sum + round2(item.sell * item.qty * itemProfitRatio(item, sellerRatio)), 0))
+  return { total, cost: round2(total - profit), profit }
+}
+
+// What a delivered order pays into the seller's balance: what they paid to start it, handed back, plus
+// their profit — the order's whole total. An order the seller never paid for has nothing to hand back.
+export const orderPayout = (order) => {
+  const paid = !!order.paidAt || !['Unpaid', 'Cancelled'].includes(order.status)
+  return round2((paid ? order.cost || 0 : 0) + (order.profit || 0))
 }
 
 // What an order is made of, checked and shaped: `{ error }` when it cannot be given, else
@@ -1313,6 +1337,8 @@ function orderContents(target, { items, customer } = {}) {
       qty: item.qty || 1,
       cost: item.cost,
       sell: item.sell,
+      // Kept so a scheduled order pays the profit that was reviewed when it was planned.
+      defaultRatio: hasProfitRatio(item.defaultRatio) ? item.defaultRatio : undefined,
     })
   )
   const { total, cost, profit } = computeOrderTotals(normalizedItems, target.profitRatio)
@@ -1352,7 +1378,7 @@ function stageOrder(db, writer, target, order, actorId, title) {
   stageNotification(db, writer, target, {
     type: 'order',
     title: 'New order assigned',
-    message: `You've been given a new order with ${order.items.length} item${order.items.length === 1 ? '' : 's'} worth ${money(order.total)}. Pay ${money(order.cost)} to start processing it.`,
+    message: `You've been given a new order with ${order.items.length} item${order.items.length === 1 ? '' : 's'} worth ${money(order.total)}. Pay ${money(order.cost)} to start processing it; on delivery ${money(order.total)} comes back to your balance (your ${money(order.cost)} plus ${money(order.profit)} profit).`,
   })
   stageActivity(db, writer, { adminId: target.adminId, sellerId: target.id, actorId, type: 'order_given', title, entity: target.fullName, icon: 'package' })
   return orderRef
@@ -1478,12 +1504,16 @@ const STATUS_MESSAGES = {
   Pickup: () => 'Your order has been picked up and is being prepared for delivery.',
   'On the way': () => 'Your order is on the way to the customer.',
   'Out for delivery': () => 'Your order is out for delivery.',
-  Delivered: (order) => `Your order has been delivered. ${money(order.profit)} profit has been added to your shop balance.`,
+  Delivered: (order, payout) =>
+    payout == null
+      ? 'Your order has been delivered.'
+      : `Your order has been delivered. ${money(payout)} has been added to your shop balance (${money(payout - (order.profit || 0))} you paid + ${money(order.profit)} profit).`,
   Cancelled: () => 'Your order was cancelled by the admin.',
 }
 
-// Moves an order through its lifecycle. Delivering it releases the seller's profit into their
-// balance — once: a flag on the order stops a second "Delivered" from paying twice.
+// Moves an order through its lifecycle. Delivering it pays the seller the order's whole total — the
+// cost they paid to start it handed back, plus their profit (see `orderPayout`) — into their balance,
+// once: a flag on the order stops a second "Delivered" from paying twice.
 export const setOrderStatus = (db, target, orderId, status, actorId) =>
   attempt(() => {
     if (!ORDER_STATUSES.includes(status)) return { success: false, error: 'Invalid order status' }
@@ -1506,17 +1536,19 @@ export const setOrderStatus = (db, target, orderId, status, actorId) =>
           delivered: Math.max(0, stats.delivered + (order.status === 'Delivered' ? -1 : 0) + (status === 'Delivered' ? 1 : 0)),
         },
       }
+      // `profitCredited` is the flag's name from when only the profit was paid out; it now marks the whole payout.
+      let credited
       if (status === 'Delivered' && !order.profitCredited) {
+        credited = orderPayout(order)
         orderChanges.profitCredited = true
-        shopChanges.balance = round2((shop.balance || 0) + (order.profit || 0))
+        shopChanges.balance = round2((shop.balance || 0) + credited)
       }
       tx.update(orderRef, orderChanges)
       tx.update(shopRef, shopChanges)
-      // The profit released on delivery is a balance change: it carries its amount so the feed can say so.
-      const credited = orderChanges.profitCredited ? order.profit || 0 : undefined
-      stageActivity(db, tx, { adminId: target.adminId, sellerId: target.id, actorId, type: 'order_status_changed', title: `Order marked ${status}`, entity: shop.fullName, icon: 'package', amount: credited, meta: credited ? { credited: true } : undefined })
+      // The payout on delivery is a balance change: it carries its amount so the feed can say so.
+      stageActivity(db, tx, { adminId: target.adminId, sellerId: target.id, actorId, type: 'order_status_changed', title: `Order marked ${status}`, entity: shop.fullName, icon: 'package', amount: credited || undefined, meta: credited ? { credited: true } : undefined })
       if (STATUS_MESSAGES[status]) {
-        stageNotification(db, tx, target, { type: 'order', title: `Order ${status.toLowerCase()}`, message: STATUS_MESSAGES[status](order) })
+        stageNotification(db, tx, target, { type: 'order', title: `Order ${status.toLowerCase()}`, message: STATUS_MESSAGES[status](order, credited) })
       }
       return { success: true }
     })

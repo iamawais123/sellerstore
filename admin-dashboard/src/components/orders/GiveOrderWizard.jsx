@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { decodeEntities } from '../../lib/activityFeed'
+import { DEFAULT_PROFIT_RANGE, computeOrderTotals, hasProfitRatio, rollProfitRatio } from '../../firebase/shopData'
 import { fromLocalInput, quickTimes, whenLabel } from '../../lib/schedules'
 import { isOnline } from '../../lib/supportChat'
 import { Icon } from './icons'
@@ -195,12 +196,12 @@ const ProductsStep = ({ products, selectedItems, onToggle }) => {
   )
 }
 
+// The same split the order is stored with: total = seller pays + profit.
 const ReviewStep = ({ items, onQtyChange, onRemove, onClearAll, seller }) => {
-  const total = items.reduce((sum, item) => sum + item.sell * item.qty, 0)
-  const cost = items.reduce((sum, item) => sum + item.cost * item.qty, 0)
-  const hasRatio = seller?.profitRatio != null
-  const itemProfit = (item) => (hasRatio ? money(item.sell * item.qty * seller.profitRatio) : '18–20%')
-  const profitLabel = hasRatio ? money(total * seller.profitRatio) : `${money(total * 0.18)}–${money(total * 0.2)}`
+  const { total, cost, profit } = computeOrderTotals(items, seller?.profitRatio)
+  const lineOf = (item) => computeOrderTotals([item], seller?.profitRatio)
+  const [low, high] = DEFAULT_PROFIT_RANGE.map((share) => Math.round(share * 100))
+  const rateNote = hasProfitRatio(seller?.profitRatio) ? `Profit rate for this seller: ${Math.round(seller.profitRatio * 10000) / 100}%` : `Default profit rate (${low}–${high}%, rolled per product)`
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -216,9 +217,9 @@ const ReviewStep = ({ items, onQtyChange, onRemove, onClearAll, seller }) => {
             <div className="min-w-0 flex-1 basis-48">
               <p className="line-clamp-2 text-sm font-bold text-slate-900">{decodeEntities(item.name)}</p>
               <p className="text-xs text-slate-500">
-                {item.qty} × {money(item.sell)} = {money(item.sell * item.qty)}
+                {item.qty} × {money(item.sell)} = {money(lineOf(item).total)}
               </p>
-              <p className="text-xs text-slate-400">Cost: {money(item.cost)}</p>
+              <p className="text-xs text-slate-400">Seller pays: {money(lineOf(item).cost)}</p>
             </div>
             <div className="flex shrink-0 items-center overflow-hidden rounded-xl border border-slate-200">
               <button type="button" onClick={() => onQtyChange(item.catalogId, -1)} disabled={item.qty <= 1} aria-label="Decrease quantity" className="px-3 py-1.5 font-black text-slate-600 hover:bg-slate-50 disabled:opacity-30">
@@ -231,17 +232,22 @@ const ReviewStep = ({ items, onQtyChange, onRemove, onClearAll, seller }) => {
                 +
               </button>
             </div>
-            <span className="shrink-0 font-black text-indigo-600">{hasRatio ? `+${itemProfit(item)}` : itemProfit(item)}</span>
+            <span className="shrink-0 font-black text-indigo-600">+{money(lineOf(item).profit)}</span>
             <button type="button" onClick={() => onRemove(item.catalogId)} aria-label={`Remove ${decodeEntities(item.name)}`} className="shrink-0 text-slate-300 hover:text-rose-600">
               <Icon name="xCircle" className="h-5 w-5" />
             </button>
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4 text-sm font-black">
-        <span className="text-slate-800">Order total {money(total)}</span>
-        <span className="text-slate-500">Seller pays {money(cost)}</span>
-        <span className="text-indigo-600">Profit {profitLabel}</span>
+      <div className="space-y-1.5 border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap justify-between gap-2 text-sm font-black">
+          <span className="text-slate-800">Order total {money(total)}</span>
+          <span className="text-slate-500">Seller pays {money(cost)}</span>
+          <span className="text-indigo-600">Profit {money(profit)}</span>
+        </div>
+        <p className="text-xs font-semibold text-slate-400">
+          {money(total)} = {money(cost)} seller pays + {money(profit)} profit · {rateNote}
+        </p>
       </div>
     </div>
   )
@@ -339,9 +345,7 @@ const GiveOrderWizard = ({ verifiedSellers, getSellerSlotInfo, getSellerShopProd
 
   const products = sellerId ? getSellerShopProductsFull(sellerId) : []
   const seller = verifiedSellers.find((candidate) => candidate.id === sellerId)
-  const total = items.reduce((sum, item) => sum + item.sell * item.qty, 0)
-  const hasRatio = seller?.profitRatio != null
-  const profitLabel = hasRatio ? money(total * seller.profitRatio) : `${money(total * 0.18)}–${money(total * 0.2)}`
+  const { total, profit } = computeOrderTotals(items, seller?.profitRatio)
 
   const scheduledIso = fromLocalInput(scheduledLocal)
   const whenError = timing !== 'scheduled' ? '' : !scheduledIso ? 'Pick a date and time.' : Date.parse(scheduledIso) <= Date.now() ? 'Pick a time in the future.' : ''
@@ -358,7 +362,8 @@ const GiveOrderWizard = ({ verifiedSellers, getSellerSlotInfo, getSellerShopProd
     setItems((current) =>
       current.some((item) => item.catalogId === product.id)
         ? current.filter((item) => item.catalogId !== product.id)
-        : [...current, { catalogId: product.id, name: product.name, image: product.image, cost: product.cost, sell: product.sell, qty: 1 }]
+        : // The default profit share is rolled once, here, so the profit shown on review is the one the order gets.
+          [...current, { catalogId: product.id, name: product.name, image: product.image, cost: product.cost, sell: product.sell, qty: 1, defaultRatio: rollProfitRatio() }]
     )
   const changeQty = (catalogId, delta) => setItems((current) => current.map((item) => (item.catalogId === catalogId ? { ...item, qty: Math.max(1, item.qty + delta) } : item)))
   const removeItem = (catalogId) => setItems((current) => current.filter((item) => item.catalogId !== catalogId))
@@ -404,7 +409,7 @@ const GiveOrderWizard = ({ verifiedSellers, getSellerSlotInfo, getSellerShopProd
       {step > 1 && (
         <div className="sticky bottom-0 -mx-5 -mb-5 flex items-center justify-between gap-3 rounded-b-3xl border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur lg:-mx-6 lg:-mb-6 lg:px-6">
           <p className="min-w-0 truncate text-xs font-semibold text-slate-500">
-            {items.length ? `${items.length} item${items.length === 1 ? '' : 's'} · ${money(total)} · profit ${profitLabel}` : 'No products selected yet'}
+            {items.length ? `${items.length} item${items.length === 1 ? '' : 's'} · ${money(total)} · profit ${money(profit)}` : 'No products selected yet'}
           </p>
           {step < 4 ? (
             <button type="button" onClick={() => setStep((current) => current + 1)} disabled={!items.length} className="shrink-0 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
