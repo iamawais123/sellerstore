@@ -48,7 +48,7 @@ const defaultSeller = {
   deleted: false,
   suspended: false,
   withdrawalsBlocked: false,
-  allowProductRemoval: true,
+  allowProductRemoval: false,
   productLimit: 50,
   viewsBoost: 0,
   kycAckSeen: false,

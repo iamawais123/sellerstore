@@ -1584,7 +1584,8 @@ const AllowProductRemovalModal = ({ seller, onClose }) => {
   const { toggleSellerProductRemoval } = useAuth()
   const [msg, setMsg] = useState('')
   const [msgT, setMsgT] = useState('')
-  const allowed = seller.allowProductRemoval ?? true
+  // Off unless an admin switched it on: a seller without the setting cannot remove products.
+  const allowed = seller.allowProductRemoval === true
 
   const doToggle = async () => {
     const next = !allowed

@@ -123,7 +123,8 @@ const shopDefaults = () => ({
   deleted: false,
   suspended: false,
   withdrawalsBlocked: false,
-  allowProductRemoval: true,
+  // No `allowProductRemoval` here on purpose: a seller cannot remove products until their admin allows it
+  // (Sellers → ⋮ → Allow Product Removal writes `true`); a shop without the field is denied.
   productLimit: 50,
   viewsBoost: 0,
   kycAckSeen: false,
@@ -857,6 +858,9 @@ export const addProductsToShop = (db, sellerId, catalogIds, actorId = sellerId, 
     })
   )
 
+// Removing products is off unless the admin switched it on for this seller (`allowProductRemoval === true`).
+const PRODUCT_REMOVAL_DENIED = 'Product removal is not allowed for your store. Ask your admin to allow it.'
+
 export const removeProductFromShop = (db, sellerId, catalogId, actorId = sellerId, details = {}) =>
   attempt(() =>
     runTransaction(db, async (tx) => {
@@ -864,7 +868,7 @@ export const removeProductFromShop = (db, sellerId, catalogId, actorId = sellerI
       const shopSnap = await tx.get(shopRef)
       if (!shopSnap.exists()) refuse('Seller not found')
       const shop = shopSnap.data()
-      if (shop.allowProductRemoval === false) refuse('Product removal is disabled by admin for your store')
+      if (shop.allowProductRemoval !== true) refuse(PRODUCT_REMOVAL_DENIED)
       tx.update(shopRef, { productIds: (shop.productIds || []).filter((id) => id !== catalogId) })
       stageActivity(db, tx, {
         adminId: shop.adminId,
@@ -889,7 +893,7 @@ export const clearShopProducts = (db, sellerId, actorId = sellerId) =>
       const shopSnap = await tx.get(shopRef)
       if (!shopSnap.exists()) refuse('Seller not found')
       const shop = shopSnap.data()
-      if (shop.allowProductRemoval === false) refuse('Product removal is disabled by admin for your store')
+      if (shop.allowProductRemoval !== true) refuse(PRODUCT_REMOVAL_DENIED)
       const existing = Array.isArray(shop.productIds) ? shop.productIds : []
       if (!existing.length) refuse('Your shop is already empty')
       tx.update(shopRef, { productIds: [] })

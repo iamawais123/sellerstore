@@ -13,7 +13,7 @@
     "build:super-admin": "npm run build --prefix super-admin-dashboard",
     "build:all": "npm run build && npm run build:admin && npm run build:super-admin && node scripts/merge-admin-build.js",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-usellerstore",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-usellerstore \"node --test --test-concurrency=1 tests/firestore.rules.test.mjs tests/shopData.flow.test.mjs tests/shopData.sync.test.mjs tests/scopedQueries.test.mjs\"",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-usellerstore \"node --test --test-concurrency=1 tests/firestore.rules.test.mjs tests/shopData.flow.test.mjs tests/shopData.sync.test.mjs tests/scopedQueries.test.mjs tests/denyProductRemoval.test.mjs\"",
     "test:telegram": "node --test tests/telegramSync.test.mjs"
   },
   "dependencies": {

@@ -6,7 +6,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 import { requireSetting } from './http.js'
 
-const readServiceAccount = () => {
+export const readServiceAccount = () => {
   const raw = requireSetting('FIREBASE_SERVICE_ACCOUNT')
   try {
     const account = JSON.parse(raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8'))

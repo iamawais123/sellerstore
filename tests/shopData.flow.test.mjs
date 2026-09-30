@@ -623,17 +623,63 @@ describe('withdrawals', () => {
 })
 
 describe('catalogue', () => {
-  it('adds products up to the limit, and stops when removal is denied', async () => {
+  it('adds products up to the limit, and removes them only once the admin has allowed it', async () => {
     const target = await verifiedShop({ balance: 0 })
     await shop.setProductLimit(db('a1'), target, 3, 'a1')
     const added = await shop.addProductsToShop(db('s1'), 's1', ['p1', 'p2', 'p3', 'p4'])
     assert.equal(added.added, 3)
     assert.equal((await shop.addProductsToShop(db('s1'), 's1', ['p5'])).success, false)
 
+    // off by default: the seller cannot remove anything until an admin allows it
+    const refused = await shop.removeProductFromShop(db('s1'), 's1', 'p1')
+    assert.equal(refused.success, false)
+    assert.match(refused.error, /not allowed.*admin/i)
+    assert.deepEqual((await read(db('s1'), 'shops/s1')).productIds, ['p1', 'p2', 'p3'])
+
+    assert.equal((await shop.setProductRemoval(db('a1'), target, true, 'a1')).success, true)
     assert.equal((await shop.removeProductFromShop(db('s1'), 's1', 'p1')).success, true)
-    await shop.setProductRemoval(db('a1'), target, false, 'a1')
+    assert.equal((await shop.setProductRemoval(db('a1'), target, false, 'a1')).success, true)
     assert.equal((await shop.removeProductFromShop(db('s1'), 's1', 'p2')).success, false)
     assert.deepEqual((await read(db('s1'), 'shops/s1')).productIds, ['p2', 'p3'])
+  })
+
+  it('starts every new shop with product removal off, and lets only the admin switch it on', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    assert.equal(shop.newShopRecord(sellerProfile('s1', 'a1')).allowProductRemoval, undefined, 'a new shop record carries no permission')
+    assert.notEqual((await read(db('s1'), 'shops/s1')).allowProductRemoval, true)
+    await shop.addProductsToShop(db('s1'), 's1', ['p1', 'p2'])
+
+    // even bypassing the app, the rules refuse a seller shrinking their own catalogue (or emptying it)
+    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { productIds: ['p1'] }))
+    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { productIds: [] }))
+    const cleared = await shop.clearShopProducts(db('s1'), 's1')
+    assert.equal(cleared.success, false)
+    assert.match(cleared.error, /not allowed.*admin/i)
+    // a seller cannot grant themself the permission
+    await assertFails(updateDoc(doc(db('s1'), 'shops/s1'), { allowProductRemoval: true }))
+    // adding more is still fine
+    await assertSucceeds(updateDoc(doc(db('s1'), 'shops/s1'), { productIds: ['p1', 'p2', 'p3'] }))
+
+    // once the admin allows it, removal works, in the app and at the rules
+    assert.equal((await shop.setProductRemoval(db('a1'), target, true, 'a1')).success, true)
+    assert.equal((await read(db('s1'), 'shops/s1')).allowProductRemoval, true)
+    await assertSucceeds(updateDoc(doc(db('s1'), 'shops/s1'), { productIds: ['p1', 'p2'] }))
+    assert.equal((await shop.clearShopProducts(db('s1'), 's1')).removed, 2)
+  })
+
+  it('refuses a shop created with product removal already on', async () => {
+    const good = shop.newShopRecord(sellerProfile('s1', 'a1'))
+    await assertFails(setDoc(doc(db('s1'), 'shops/s1'), { ...good, allowProductRemoval: true }))
+    await assertSucceeds(setDoc(doc(db('s1'), 'shops/s1'), { ...good, allowProductRemoval: false }))
+  })
+
+  it('keeps a shop that stored the old default (removal on) removable until an admin denies it', async () => {
+    const target = await verifiedShop({ balance: 0 })
+    await env.withSecurityRulesDisabled(async (ctx) => updateDoc(doc(ctx.firestore(), 'shops/s1'), { allowProductRemoval: true }))
+    await shop.addProductsToShop(db('s1'), 's1', ['p1', 'p2'])
+    assert.equal((await shop.removeProductFromShop(db('s1'), 's1', 'p1')).success, true)
+    assert.equal((await shop.setProductRemoval(db('a1'), target, false, 'a1')).success, true)
+    assert.equal((await shop.removeProductFromShop(db('s1'), 's1', 'p2')).success, false)
   })
 
   it('never lets a seller exceed their limit or add products before verification', async () => {
@@ -889,7 +935,8 @@ describe('what Recent Actions and My Logs read', () => {
   })
 
   it('lists the products added to a shop, and what was removed', async () => {
-    await verifiedShop({ balance: 0 })
+    const target = await verifiedShop({ balance: 0 })
+    await shop.setProductRemoval(db('a1'), target, true, 'a1')
     const details = { p1: { name: 'Bakers Rack', image: '/assets/a.jpg', price: 99.99 }, p2: { name: 'Desk', image: '/assets/b.jpg', price: 89.99 } }
     assert.equal((await shop.addProductsToShop(db('s1'), 's1', ['p1', 'p2'], 's1', details)).success, true)
     const [added] = await lastActivity('seller_products_added')

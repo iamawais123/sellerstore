@@ -100,9 +100,13 @@ const CatalogModal = ({ seller, onClose }) => {
             </div>
             <div>
               <p className="text-xl font-black text-gray-900">{slots.limit} / {slots.limit} slots full</p>
-              <p className="mt-1 text-gray-500">Remove a few products from "My Products", or clear your whole shop below to restock from scratch.</p>
+              <p className="mt-1 text-gray-500">
+                {seller.allowProductRemoval === true
+                  ? 'Remove a few products from "My Products", or clear your whole shop below to restock from scratch.'
+                  : 'Your shop is full. Products can only be removed when your admin allows it, so contact support if you need a slot.'}
+              </p>
             </div>
-            {seller.allowProductRemoval !== false &&
+            {seller.allowProductRemoval === true &&
               (confirmClear ? (
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <span className="font-bold text-rose-600">Remove all {slots.used} products?</span>
@@ -229,7 +233,7 @@ const SellerProducts = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {products.length > 0 && seller.allowProductRemoval !== false && (
+          {products.length > 0 && seller.allowProductRemoval === true && (
             confirmClear ? (
               <div className="flex items-center gap-2 rounded-2xl border-2 border-rose-200 bg-rose-50 px-3 py-2.5">
                 <span className="text-sm font-bold text-rose-700">Remove all {products.length}?</span>
@@ -290,7 +294,7 @@ const SellerProducts = () => {
                     Price <span className="font-black text-gray-900">{money(product.sell)}</span>
                   </p>
                 </div>
-                {seller.allowProductRemoval !== false && (
+                {seller.allowProductRemoval === true && (
                   <button onClick={() => handleRemove(product.id)} title="Remove from shop" className="shrink-0 rounded-xl p-2 text-gray-300 hover:bg-rose-50 hover:text-rose-600">
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>

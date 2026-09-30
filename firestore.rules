@@ -323,7 +323,8 @@ service cloud.firestore {
         && request.resource.data.get('deleted', false) == false
         && request.resource.data.get('suspended', false) == false
         && request.resource.data.get('withdrawalsBlocked', false) == false
-        && request.resource.data.get('allowProductRemoval', true) == true
+        // Removing products starts off: only an admin can switch it on later (a missing field means off).
+        && request.resource.data.get('allowProductRemoval', false) == false
         && request.resource.data.get('productLimit', 50) == 50
         && request.resource.data.get('viewsBoost', 0) == 0
         && request.resource.data.get('kycAckSeen', false) == false
@@ -358,7 +359,7 @@ service cloud.firestore {
               && resource.data.verified == true
               && shopOpen(resource.data)
               && request.resource.data.productIds.size() <= resource.data.productLimit
-              && (resource.data.get('allowProductRemoval', true) == true
+              && (resource.data.get('allowProductRemoval', false) == true
                   || request.resource.data.productIds.hasAll(resource.data.get('productIds', []))))))
         // The admin who owns the seller (or a super admin): everything an admin console edits.
         || (managesDoc()
@@ -668,7 +669,8 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // An admin's Telegram link: { chatId, chatName, enabled, prefs: { activity, support, logins }, ... }.
+    // An admin's Telegram link: { chatId, chatName, enabled, prefs: { activity, support, logins }, ... } (only
+    // `support` is used now — alerts are for support messages alone — the other two are kept so the shape stays valid).
     // The Telegram relay (api/, running with the Admin SDK) creates, updates and deletes it as the
     // admin connects; the admin can only read it and switch things on and off. Nothing in it is a secret
     // (the bot token lives in the relay's environment), but the chat is theirs alone to see.
